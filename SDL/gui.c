@@ -10,6 +10,7 @@
 #include "gui.h"
 #include "font.h"
 #include "audio/audio.h"
+#include "Core/workboy.h"
 
 static const SDL_Color gui_palette[4] = {{8, 24, 16,}, {57, 97, 57,}, {132, 165, 99}, {198, 222, 140}};
 static uint32_t gui_palette_native[4];
@@ -1108,6 +1109,12 @@ static void toggle_rtc_mode(unsigned index)
     configuration.rtc_mode = !configuration.rtc_mode;
 }
 
+static void connect_workboy(unsigned index)
+{
+    SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy now connected. \n\nF12 for keyboard enable.\n Do ROM Reset or Hotswap.", window);
+    GB_connect_workboy(&gb, (GB_workboy_set_time_callback)NULL, (GB_workboy_get_time_callback)NULL);
+}
+
 static const char *current_rtc_mode_string(unsigned index)
 {
     switch (configuration.rtc_mode) {
@@ -1140,6 +1147,7 @@ static const struct menu_item emulation_menu[] = {
     {"Boot ROMs Folder:", toggle_bootrom, current_bootrom_string, toggle_bootrom},
     {"Rewind Length:", cycle_rewind, current_rewind_string, cycle_rewind_backwards},
     {"Real Time Clock:", toggle_rtc_mode, current_rtc_mode_string, toggle_rtc_mode},
+    {"Connect Workboy", connect_workboy},
     {"Back", enter_options_menu},
     {NULL,}
 };
@@ -2145,6 +2153,7 @@ void update_swap_interval(void)
         SDL_GL_SetSwapInterval(0);
     }
 }
+
 
 void run_gui(bool is_running)
 {

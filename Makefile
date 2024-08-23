@@ -345,7 +345,8 @@ ifeq ($(PLATFORM),windows32)
 SDL_TARGET := $(BIN)/SDL/sameboy.exe $(BIN)/SDL/sameboy_debugger.exe $(BIN)/SDL/SDL2.dll
 TESTER_TARGET := $(BIN)/tester/sameboy_tester.exe
 else
-SDL_TARGET := $(BIN)/SDL/sameboy
+# SDL_TARGET := $(BIN)/SDL/sameboy
+SDL_TARGET := $(BIN)/SDL/sameboy $(BIN)/SDL/sameboy_debugger
 TESTER_TARGET := $(BIN)/tester/sameboy_tester
 endif
 
@@ -590,6 +591,11 @@ ifeq ($(CONF), release)
 	$(STRIP) $@
 	$(CODESIGN) $@
 endif
+
+$(BIN)/SDL/sameboy_debugger: $(CORE_OBJECTS) $(SDL_OBJECTS) #  $(OBJ)/Windows/resources.o
+	-@$(MKDIR) -p $(dir $@)
+	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) # -Wl,/subsystem:console
+
 
 # Windows version builds two, one with a conole and one without it
 $(BIN)/SDL/sameboy.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o

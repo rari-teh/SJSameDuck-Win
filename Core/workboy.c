@@ -1,6 +1,10 @@
 #include "gb.h"
 #include <time.h>
 #include <string.h>
+#include <stdio.h>
+
+#define WORKBOY_SERIAL_LOGGING_ENABLED
+//#define WORKBOY_SERIAL_LOG_ALL_IN_OUT
 
 static inline uint8_t int_to_bcd(uint8_t i)
 {
@@ -24,18 +28,21 @@ static void serial_start(GB_gameboy_t *gb, bool bit_received)
     gb->workboy.byte_being_received |= bit_received;
     gb->workboy.bits_received++;
     if (gb->workboy.bits_received == 8) {
+
         gb->workboy.byte_to_send = 0;
         if (gb->workboy.mode != 'W' && gb->workboy.byte_being_received == 'R') {
             gb->workboy.byte_to_send = 'D';
             gb->workboy.key = GB_WORKBOY_NONE;
             gb->workboy.mode = gb->workboy.byte_being_received;
             gb->workboy.buffer_index = 1;
-            
-            time_t time = gb->workboy_get_time_callback(gb);
+
+            // time_t time = gb->workboy_get_time_callback(gb);
+            time_t rawtime;
+            time(&rawtime);
             struct tm tm;
-            tm = *localtime(&time);
+            tm = *localtime(&rawtime);
             memset(gb->workboy.buffer, 0, sizeof(gb->workboy.buffer));
-            
+
             gb->workboy.buffer[0] = 4; // Unknown, unused, but appears to be expected to be 4
             gb->workboy.buffer[2] = int_to_bcd(tm.tm_sec); // Seconds, BCD
             gb->workboy.buffer[3] = int_to_bcd(tm.tm_min); // Minutes, BCD
@@ -44,6 +51,22 @@ static void serial_start(GB_gameboy_t *gb, bool bit_received)
             gb->workboy.buffer[6] = int_to_bcd(tm.tm_mon + 1); // Months, BCD
             gb->workboy.buffer[0xF] = tm.tm_year; // Years, plain number, since 1900
 
+#ifdef WORKBOY_SERIAL_LOGGING_ENABLED
+            printf("[0] %0x (4)\n"
+                   "[2] %0x (sec)\n"
+                   "[3] %0x (min)\n"
+                   "[4] %0x (hour)\n"
+                   "[5] %0x (day)\n"
+                   "[6] %0x (month)\n"
+                   "[F] %0x (years)\n",
+            gb->workboy.buffer[0],
+            gb->workboy.buffer[2],
+            gb->workboy.buffer[3],
+            gb->workboy.buffer[4],
+            gb->workboy.buffer[5],
+            gb->workboy.buffer[6],
+            gb->workboy.buffer[0xF]);
+#endif
         }
         else if (gb->workboy.mode != 'W' && gb->workboy.byte_being_received == 'W') {
             gb->workboy.byte_to_send = 'D'; // It is actually unknown what this value should be
@@ -114,21 +137,30 @@ static void serial_start(GB_gameboy_t *gb, bool bit_received)
                 gb->workboy.buffer[gb->workboy.buffer_index - 2] = gb->workboy.byte_being_received;
                 gb->workboy.buffer_index++;
                 if (gb->workboy.buffer_index - 2 == sizeof(gb->workboy.buffer)) {
-                    struct tm tm = {0,};
-                    tm.tm_sec = bcd_to_int(gb->workboy.buffer[7]);
-                    tm.tm_min = bcd_to_int(gb->workboy.buffer[8]);
-                    tm.tm_hour = bcd_to_int(gb->workboy.buffer[9]);
-                    tm.tm_mday = bcd_to_int(gb->workboy.buffer[0xA]);
-                    tm.tm_mon = bcd_to_int(gb->workboy.buffer[0xB] & 0x3F) - 1;
-                    tm.tm_year = (uint8_t)(gb->workboy.buffer[0x14] + (gb->workboy.buffer[0xA] >> 6)); // What were they thinking?
-                    gb->workboy_set_time_callback(gb, mktime(&tm));
+                    // struct tm tm = {0,};
+                    // tm.tm_sec = bcd_to_int(gb->workboy.buffer[7]);
+                    // tm.tm_min = bcd_to_int(gb->workboy.buffer[8]);
+                    // tm.tm_hour = bcd_to_int(gb->workboy.buffer[9]);
+                    // tm.tm_mday = bcd_to_int(gb->workboy.buffer[0xA]);
+                    // tm.tm_mon = bcd_to_int(gb->workboy.buffer[0xB] & 0x3F) - 1;
+                    // tm.tm_year = (uint8_t)(gb->workboy.buffer[0x14] + (gb->workboy.buffer[0xA] >> 6)); // What were they thinking?
+                    // gb->workboy_set_time_callback(gb, mktime(&tm));
                     gb->workboy.mode = 'O';
                 }
             }
         }
+#ifdef WORKBOY_SERIAL_LOGGING_ENABLED
+    #ifdef WORKBOY_SERIAL_LOG_ALL_IN_OUT
+        printf("WorkBoy  from-gb-RX:%02x(%c)  to-gb-TX:%02x(%c)  ( ROMB:%02x  PC:%04x )\n",
+            gb->workboy.byte_being_received, gb->workboy.byte_being_received,
+            gb->workboy.byte_to_send, gb->workboy.byte_to_send,
+            gb->mbc_rom_bank, gb->pc);
+    #endif
+#endif
+
         gb->workboy.bits_received = 0;
         gb->workboy.byte_being_received = 0;
-    }
+    }  // End: 8 bits received
 }
 
 static bool serial_end(GB_gameboy_t *gb)
