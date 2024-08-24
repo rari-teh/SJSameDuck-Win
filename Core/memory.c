@@ -6,6 +6,12 @@
 typedef uint8_t read_function_t(GB_gameboy_t *gb, uint16_t addr);
 typedef void write_function_t(GB_gameboy_t *gb, uint16_t addr, uint8_t value);
 
+static void write_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck, uint8_t value_duck);
+static uint8_t read_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck);
+
+// #define DEBUG_LOG_DUCK_TRANSLATED_IO
+
+
 typedef enum {
     GB_BUS_MAIN, /* In DMG: Cart and RAM. In CGB: Cart only */
     GB_BUS_RAM, /* In CGB only. */
@@ -270,13 +276,15 @@ static bool is_addr_in_dma_use(GB_gameboy_t *gb, uint16_t addr)
 
 static uint8_t read_rom(GB_gameboy_t *gb, uint16_t addr)
 {
-    if (addr < 0x100 && !gb->boot_rom_finished) {
-        return gb->boot_rom[addr];
-    }
+    // No Duck Boot ROM
 
-    if (addr >= 0x200 && addr < 0x900 && GB_is_cgb(gb) && !gb->boot_rom_finished) {
-        return gb->boot_rom[addr];
-    }
+    // if (addr < 0x100 && !gb->boot_rom_finished) {
+    //     return gb->boot_rom[addr];
+    // }
+
+    // if (addr >= 0x200 && addr < 0x900 && GB_is_cgb(gb) && !gb->boot_rom_finished) {
+    //     return gb->boot_rom[addr];
+    // }
 
     if (!gb->rom_size) {
         return 0xFF;
@@ -537,6 +545,7 @@ internal uint8_t GB_read_oam(GB_gameboy_t *gb, uint8_t addr)
     unreachable();
 }
 
+
 static uint8_t read_high_memory(GB_gameboy_t *gb, uint16_t addr)
 {
     if (addr < 0xFE00) {
@@ -699,7 +708,7 @@ static uint8_t read_high_memory(GB_gameboy_t *gb, uint16_t addr)
             case GB_IO_BGPD:
             case GB_IO_OBPD:
             {
-                if (!gb->cgb_mode && gb->boot_rom_finished) {
+                if (!gb->cgb_mode) { //  && gb->boot_rom_finished) {
                     return 0xFF;
                 }
                 if (gb->cgb_palettes_blocked) {
@@ -717,7 +726,7 @@ static uint8_t read_high_memory(GB_gameboy_t *gb, uint16_t addr)
                 }
                 return (gb->io_registers[GB_IO_KEY1] & 0x7F) | (gb->cgb_double_speed? 0xFE : 0x7E);
             case GB_IO_BANK:
-                return 0xFE | gb->boot_rom_finished;
+                return 0xFE; //  | gb->boot_rom_finished;
             case GB_IO_RP: {
                 if (!gb->cgb_mode) return 0xFF;
                 /* You will read your own IR LED if it's on. */
@@ -762,7 +771,8 @@ static read_function_t *const read_map[] =
     read_vram,        read_vram,                                    /* 8XXX, 9XXX */
     read_mbc_ram,     read_mbc_ram,                                 /* AXXX, BXXX */
     read_ram,         read_banked_ram,                              /* CXXX, DXXX */
-    read_ram,         read_high_memory,                             /* EXXX FXXX */
+    read_ram,         read_high_memory_duck,                        /* EXXX FXXX */
+    // read_ram,         read_high_memory,                             /* EXXX FXXX */
 };
 
 void GB_set_read_memory_callback(GB_gameboy_t *gb, GB_read_memory_callback_t callback)
@@ -1414,7 +1424,8 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                 gb->io_registers[addr & 0xFF] = value;
                 return;
             case GB_IO_OPRI:
-                if ((!gb->boot_rom_finished || (gb->io_registers[GB_IO_KEY0] & 8)) && GB_is_cgb(gb)) {
+                // if ((!gb->boot_rom_finished || (gb->io_registers[GB_IO_KEY0] & 8)) && GB_is_cgb(gb)) {
+                if (((gb->io_registers[GB_IO_KEY0] & 8)) && GB_is_cgb(gb)) {
                     gb->io_registers[addr & 0xFF] = value;
                     gb->object_priority = (value & 1) ? GB_OBJECT_PRIORITY_X : GB_OBJECT_PRIORITY_INDEX;
                 }
@@ -1593,11 +1604,11 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                 return;
 
             case GB_IO_BANK:
-                gb->boot_rom_finished |= value & 1;
+                // gb->boot_rom_finished |= value & 1;
                 return;
 
             case GB_IO_KEY0:
-                if (GB_is_cgb(gb) && !gb->boot_rom_finished) {
+                if (GB_is_cgb(gb)) { //  && !gb->boot_rom_finished) {
                     gb->cgb_mode = !(value & 0xC); /* The real "contents" of this register aren't quite known yet. */
                     gb->io_registers[GB_IO_KEY0] = value;
                 }
@@ -1613,7 +1624,7 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                 GB_STAT_update(gb);
                 return;
             case GB_IO_SVBK:
-                if (gb->cgb_mode || (GB_is_cgb(gb) && !gb->boot_rom_finished)) {
+                if (gb->cgb_mode || (GB_is_cgb(gb) )) { // && !gb->boot_rom_finished)) {
                     gb->cgb_ram_bank = value & 0x7;
                     if (!gb->cgb_ram_bank) {
                         gb->cgb_ram_bank++;
@@ -1637,7 +1648,7 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                 return;
             case GB_IO_BGPD:
             case GB_IO_OBPD:
-                if (!gb->cgb_mode && gb->boot_rom_finished) {
+                if (!gb->cgb_mode ) { //   && gb->boot_rom_finished) {
                     /* Todo: Due to the behavior of a broken Game & Watch Gallery 2 ROM on a real CGB. A proper test ROM
                        is required. */
                     return;
@@ -1772,7 +1783,8 @@ static write_function_t *const write_map[] =
     write_vram,        write_vram,                             /* 8XXX, 9XXX */
     write_mbc_ram,     write_mbc_ram,                          /* AXXX, BXXX */
     write_ram,         write_banked_ram,                       /* CXXX, DXXX */
-    write_ram,         write_high_memory,                      /* EXXX FXXX */
+    write_ram,         write_high_memory_duck,                 /* EXXX FXXX */
+    // write_ram,         write_high_memory,                      /* EXXX FXXX */
 };
 
 void GB_set_write_memory_callback(GB_gameboy_t *gb, GB_write_memory_callback_t callback)
@@ -1946,3 +1958,206 @@ void GB_hdma_run(GB_gameboy_t *gb)
         GB_advance_cycles(gb, 2);
     }
 }
+
+
+
+// *****************************************************
+// START MegaDuck Register Address and Value translation
+// *****************************************************
+
+static uint16_t translate_io_addr_duck_to_gb(uint16_t duck_addr) {
+
+    uint8_t duck_addr_low = (duck_addr & 0xFF);
+    switch (duck_addr_low) {
+        // Equiv to GB_IO_NR10 -> GB_IO_NR52
+        case DUCK_IO_NR10: return (0xFF00 | GB_IO_NR10);
+        case DUCK_IO_NR11: return (0xFF00 | GB_IO_NR11);
+        case DUCK_IO_NR12: return (0xFF00 | GB_IO_NR12);
+        case DUCK_IO_NR13: return (0xFF00 | GB_IO_NR13);
+        case DUCK_IO_NR14: return (0xFF00 | GB_IO_NR14);
+        case DUCK_IO_NR21: return (0xFF00 | GB_IO_NR21);
+        case DUCK_IO_NR22: return (0xFF00 | GB_IO_NR22);
+        case DUCK_IO_NR23: return (0xFF00 | GB_IO_NR23);
+        case DUCK_IO_NR24: return (0xFF00 | GB_IO_NR24);
+        case DUCK_IO_NR30: return (0xFF00 | GB_IO_NR30);
+        case DUCK_IO_NR31: return (0xFF00 | GB_IO_NR31);
+        case DUCK_IO_NR32: return (0xFF00 | GB_IO_NR32);
+        case DUCK_IO_NR33: return (0xFF00 | GB_IO_NR33);
+        case DUCK_IO_NR34: return (0xFF00 | GB_IO_NR34);
+        // DUCK_IO_WAV_START (no change)
+        // DUCK_IO_WAV_END (no change)
+        case DUCK_IO_NR41: return (0xFF00 | GB_IO_NR41);
+        case DUCK_IO_NR42: return (0xFF00 | GB_IO_NR42);
+        case DUCK_IO_NR43: return (0xFF00 | GB_IO_NR43);
+        case DUCK_IO_NR44: return (0xFF00 | GB_IO_NR44);
+        case DUCK_IO_NR50: return (0xFF00 | GB_IO_NR50);
+        case DUCK_IO_NR51: return (0xFF00 | GB_IO_NR51);
+        case DUCK_IO_NR52: return (0xFF00 | GB_IO_NR52);
+
+        // Equiv to GB_IO_LCDC -> GB_IO_WX
+        case DUCK_IO_LCDC: return (0xFF00 | GB_IO_LCDC);
+        case DUCK_IO_STAT: return (0xFF00 | GB_IO_STAT);
+        case DUCK_IO_SCY:  return (0xFF00 | GB_IO_SCY);
+        case DUCK_IO_SCX:  return (0xFF00 | GB_IO_SCX);
+        case DUCK_IO_OBP0: return (0xFF00 | GB_IO_OBP0);
+        case DUCK_IO_OBP1: return (0xFF00 | GB_IO_OBP1);
+        case DUCK_IO_WY:   return (0xFF00 | GB_IO_WY);
+        case DUCK_IO_WX:   return (0xFF00 | GB_IO_WX);
+        case DUCK_IO_LY:   return (0xFF00 | GB_IO_LY);
+        case DUCK_IO_LYC:  return (0xFF00 | GB_IO_LYC);
+        case DUCK_IO_DMA:  return (0xFF00 | GB_IO_DMA);
+        case DUCK_IO_BGP:  return (0xFF00 | GB_IO_BGP);
+    }
+
+    // If not matched then return the address unchanged
+    return duck_addr;
+}
+
+
+static uint8_t nybble_swap(uint8_t value) {
+    return ((value >> 4) | (value << 4));
+}
+
+
+// Expects value in ** GB ** mode
+static uint8_t lcdc_translate_value_gb_to_duck(uint8_t value_gb) {
+    uint8_t value_duck = 0x00; // All bits unset
+
+    if (value_gb & GB_LCDCF_ON)      value_duck |= DUCK_LCDCF_ON;
+    if (value_gb & GB_LCDCF_WIN9C00) value_duck |= DUCK_LCDCF_WIN9C00;
+    if (value_gb & GB_LCDCF_WINON)   value_duck |= DUCK_LCDCF_WINON;
+    if (value_gb & GB_LCDCF_BG8000)  value_duck |= DUCK_LCDCF_BG8000;
+    if (value_gb & GB_LCDCF_BG9C00)  value_duck |= DUCK_LCDCF_BG9C00;
+    if (value_gb & GB_LCDCF_OBJ16)   value_duck |= DUCK_LCDCF_OBJ16;
+    if (value_gb & GB_LCDCF_OBJON)   value_duck |= DUCK_LCDCF_OBJON;
+    if (value_gb & GB_LCDCF_BGON)    value_duck |= DUCK_LCDCF_BGON;
+
+    return value_duck;
+}
+
+
+// Expects value in ** DUCK ** mode
+static uint8_t lcdc_translate_value_duck_to_gb(uint8_t value_duck) {
+    uint8_t value_gb = 0x00; // All bits unset
+
+    if (value_duck & DUCK_LCDCF_ON)      value_gb |= GB_LCDCF_ON;
+    if (value_duck & DUCK_LCDCF_WIN9C00) value_gb |= GB_LCDCF_WIN9C00;
+    if (value_duck & DUCK_LCDCF_WINON)   value_gb |= GB_LCDCF_WINON;
+    if (value_duck & DUCK_LCDCF_BG8000)  value_gb |= GB_LCDCF_BG8000;
+    if (value_duck & DUCK_LCDCF_BG9C00)  value_gb |= GB_LCDCF_BG9C00;
+    if (value_duck & DUCK_LCDCF_OBJ16)   value_gb |= GB_LCDCF_OBJ16;
+    if (value_duck & DUCK_LCDCF_OBJON)   value_gb |= GB_LCDCF_OBJON;
+    if (value_duck & DUCK_LCDCF_BGON)    value_gb |= GB_LCDCF_BGON;
+
+    return value_gb;
+}
+
+
+// Expects value in ** DUCK ** mode
+static inline uint8_t nr32_volume_swizzle_duck_to_gb(uint8_t value_duck) {
+    // Game Boy:  Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    // Mega Duck: Bits:6..5 : 00 = mute, 01 = 25%,  10 = 50%, 11 = 100%
+    switch (value_duck & DUCK_NR32_VOL_MASK) {
+        case DUCK_NR32_VOL_MUTE: return (value_duck & ~DUCK_NR32_VOL_MASK) | GB_NR32_VOL_MUTE;
+        case DUCK_NR32_VOL_100:  return (value_duck & ~DUCK_NR32_VOL_MASK) | GB_NR32_VOL_100;
+        case DUCK_NR32_VOL_50:   return (value_duck & ~DUCK_NR32_VOL_MASK) | GB_NR32_VOL_50;
+        case DUCK_NR32_VOL_25:   return (value_duck & ~DUCK_NR32_VOL_MASK) | GB_NR32_VOL_25;
+    }
+
+    // If not matched then return the io reg read unchanged
+    return value_duck;
+}
+
+
+// Expects value in ** GB ** mode
+static inline uint8_t nr32_volume_swizzle_gb_to_duck(uint8_t value_gb) {
+    // Game Boy:  Bits:6..5 : 00 = mute, 01 = 100%, 10 = 50%, 11 = 25%
+    // Mega Duck: Bits:6..5 : 00 = mute, 01 = 25%,  10 = 50%, 11 = 100%
+    switch (value_gb & GB_NR32_VOL_MASK) {
+        case GB_NR32_VOL_MUTE: return (value_gb & ~GB_NR32_VOL_MASK) | DUCK_NR32_VOL_MUTE;
+        case GB_NR32_VOL_100:  return (value_gb & ~GB_NR32_VOL_MASK) | DUCK_NR32_VOL_100;
+        case GB_NR32_VOL_50:   return (value_gb & ~GB_NR32_VOL_MASK) | DUCK_NR32_VOL_50;
+        case GB_NR32_VOL_25:   return (value_gb & ~GB_NR32_VOL_MASK) | DUCK_NR32_VOL_25;
+    }
+
+    // If not matched then return the io reg read unchanged
+    return value_gb;
+}
+
+
+// Expects IO address in ** DUCK ** mode
+static uint8_t translate_io_reg_value_duck_to_gb(uint16_t addr_duck, uint8_t value_duck) {
+
+    uint8_t addr_duck_low = (addr_duck & 0xFF);
+    switch (addr_duck_low) {
+        case DUCK_IO_NR12: return nybble_swap(value_duck);
+        case DUCK_IO_NR22: return nybble_swap(value_duck);
+        case DUCK_IO_NR32: return nr32_volume_swizzle_duck_to_gb(value_duck);
+        case DUCK_IO_NR43: return nybble_swap(value_duck);
+        case DUCK_IO_NR42: return nybble_swap(value_duck);
+
+        case DUCK_IO_LCDC: return lcdc_translate_value_duck_to_gb(value_duck);
+    }
+
+    // If not matched then return the io reg read unchanged
+    return value_duck;
+}
+
+
+// Expects IO address in ** GB ** mode
+static uint8_t translate_io_reg_value_gb_to_duck(uint16_t addr_gb, uint8_t value_gb) {
+
+    uint8_t addr_gb_low = (addr_gb & 0xFF);
+    switch (addr_gb_low) {
+        case GB_IO_NR12: return nybble_swap(value_gb);
+        case GB_IO_NR22: return nybble_swap(value_gb);
+        case GB_IO_NR32: return nr32_volume_swizzle_gb_to_duck(value_gb);
+        case GB_IO_NR43: return nybble_swap(value_gb);
+        case GB_IO_NR42: return nybble_swap(value_gb);
+
+        case GB_IO_LCDC: return lcdc_translate_value_gb_to_duck(value_gb);
+    }
+
+    // If not matched then return the io reg read unchanged
+    return value_gb;
+}
+
+
+
+// Main wrapper to translate incoming MegaDuck high memory io reg writes into GB address and bit flags
+static void write_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck, uint8_t value_duck) {
+
+    // Translate address from Duck to GB, translate the value to GB and then write it
+    uint8_t value_gb = translate_io_reg_value_duck_to_gb(addr_duck, value_duck);
+    uint16_t addr_gb = translate_io_addr_duck_to_gb(addr_duck);
+    write_high_memory(gb, addr_gb, value_gb);
+
+    #ifdef DEBUG_LOG_DUCK_TRANSLATED_IO
+        printf("# WR high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_duck: %02X -> value_gb: %02X\n",
+                addr_duck, addr_gb, value_duck, value_gb);
+    #endif
+}
+
+
+// Main wrapper to translate incoming MegaDuck high memory io reg reads into GB address then convert read GB bitflags to Duck
+static uint8_t read_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck) {
+
+    // Translate address from Duck to GB, read the memory
+    uint16_t addr_gb = translate_io_addr_duck_to_gb(addr_duck);
+    uint8_t value_gb = read_high_memory(gb, addr_gb);
+
+    // Translate resulting value to Duck
+    uint8_t value_duck = translate_io_reg_value_gb_to_duck(addr_gb, value_gb);
+
+    #ifdef DEBUG_LOG_DUCK_TRANSLATED_IO
+        printf("# RD high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_gb: %02X -> value_duck: %02X\n",
+                addr_duck, addr_gb, value_gb, value_duck);
+    #endif
+
+    return value_duck;
+}
+
+
+// *****************************************************
+// END   MegaDuck Register Address and Value translation
+// *****************************************************

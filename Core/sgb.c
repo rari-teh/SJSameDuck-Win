@@ -150,7 +150,9 @@ static void command_ready(GB_gameboy_t *gb)
        0xE content bytes. The last command, FB, is padded with zeros, so information past the header is not sent. */
     
     if ((gb->sgb->command[0] & 0xF1) == 0xF1) {
-        if (gb->boot_rom_finished) return;
+        // if (gb->boot_rom_finished) return;
+        // Duck has no Boot ROM
+        return;
         
         uint8_t checksum = 0;
         for (unsigned i = 2; i < 0x10; i++) {

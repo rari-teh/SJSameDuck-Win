@@ -831,38 +831,40 @@ static bool handle_pending_command(void)
 
 static void load_boot_rom(GB_gameboy_t *gb, GB_boot_rom_t type)
 {
-    static const char *const names[] = {
-        [GB_BOOT_ROM_DMG_0] = "dmg0_boot.bin",
-        [GB_BOOT_ROM_DMG] = "dmg_boot.bin",
-        [GB_BOOT_ROM_MGB] = "mgb_boot.bin",
-        [GB_BOOT_ROM_SGB] = "sgb_boot.bin",
-        [GB_BOOT_ROM_SGB2] = "sgb2_boot.bin",
-        [GB_BOOT_ROM_CGB_0] = "cgb0_boot.bin",
-        [GB_BOOT_ROM_CGB] = "cgb_boot.bin",
-        [GB_BOOT_ROM_CGB_E] = "cgbE_boot.bin",
-        [GB_BOOT_ROM_AGB_0] = "agb0_boot.bin",
-        [GB_BOOT_ROM_AGB] = "agb_boot.bin",
-    };
-    bool use_built_in = true;
-    if (configuration.bootrom_path[0]) {
-        static char path[PATH_MAX + 1];
-        snprintf(path, sizeof(path), "%s/%s", configuration.bootrom_path, names[type]);
-        use_built_in = GB_load_boot_rom(gb, path);
-    }
-    if (use_built_in) {
-        start_capturing_logs();
-        if (GB_load_boot_rom(gb, resource_path(names[type]))) {
-            if (type == GB_BOOT_ROM_CGB_E) {
-                load_boot_rom(gb, GB_BOOT_ROM_CGB);
-                return;
-            }
-            if (type == GB_BOOT_ROM_AGB_0) {
-                load_boot_rom(gb, GB_BOOT_ROM_AGB);
-                return;
-            }
-        }
-        end_capturing_logs(true, false, SDL_MESSAGEBOX_ERROR, "Error");
-    }
+    return;
+
+    // static const char *const names[] = {
+    //     [GB_BOOT_ROM_DMG_0] = "dmg0_boot.bin",
+    //     [GB_BOOT_ROM_DMG] = "dmg_boot.bin",
+    //     [GB_BOOT_ROM_MGB] = "mgb_boot.bin",
+    //     [GB_BOOT_ROM_SGB] = "sgb_boot.bin",
+    //     [GB_BOOT_ROM_SGB2] = "sgb2_boot.bin",
+    //     [GB_BOOT_ROM_CGB_0] = "cgb0_boot.bin",
+    //     [GB_BOOT_ROM_CGB] = "cgb_boot.bin",
+    //     [GB_BOOT_ROM_CGB_E] = "cgbE_boot.bin",
+    //     [GB_BOOT_ROM_AGB_0] = "agb0_boot.bin",
+    //     [GB_BOOT_ROM_AGB] = "agb_boot.bin",
+    // };
+    // bool use_built_in = true;
+    // if (configuration.bootrom_path[0]) {
+    //     static char path[PATH_MAX + 1];
+    //     snprintf(path, sizeof(path), "%s/%s", configuration.bootrom_path, names[type]);
+    //     use_built_in = GB_load_boot_rom(gb, path);
+    // }
+    // if (use_built_in) {
+    //     start_capturing_logs();
+    //     if (GB_load_boot_rom(gb, resource_path(names[type]))) {
+    //         if (type == GB_BOOT_ROM_CGB_E) {
+    //             load_boot_rom(gb, GB_BOOT_ROM_CGB);
+    //             return;
+    //         }
+    //         if (type == GB_BOOT_ROM_AGB_0) {
+    //             load_boot_rom(gb, GB_BOOT_ROM_AGB);
+    //             return;
+    //         }
+    //     }
+    //     end_capturing_logs(true, false, SDL_MESSAGEBOX_ERROR, "Error");
+    // }
 }
 
 static bool is_path_writeable(const char *path)
@@ -1017,7 +1019,7 @@ restart:
     static char start_text[64];
     static char title[17];
     GB_get_rom_title(&gb, title);
-    sprintf(start_text, "SameBoy v" GB_VERSION "\n%s\n%08X", title, GB_get_rom_crc32(&gb));
+    sprintf(start_text, "SameDuck v" GB_VERSION "\n%s\n%08X", title, GB_get_rom_crc32(&gb));
     show_osd_text(start_text);
 
     /* Configure symbols */
@@ -1204,7 +1206,7 @@ int main(int argc, char **argv)
     
 
     if (argc > 2 || (argc == 2 && argv[1][0] == '-')) {
-        fprintf(stderr, "SameBoy v" GB_VERSION "\n");
+        fprintf(stderr, "SameDuck v" GB_VERSION "\n");
         fprintf(stderr, "Usage: %s [--fullscreen|-f] [--nogl] [--stop-debugger|-s] [--model <model>] <rom>\n", argv[0]);
         exit(1);
     }
@@ -1225,15 +1227,15 @@ int main(int argc, char **argv)
 
     if ((console_supported = CON_start(completer))) {
         CON_set_repeat_empty(true);
-        CON_printf("SameBoy v" GB_VERSION "\n");
+        CON_printf("SameDuck v" GB_VERSION "\n");
     }
     else {
-        fprintf(stderr, "SameBoy v" GB_VERSION "\n");
+        fprintf(stderr, "SameDuck v" GB_VERSION "\n");
     }
     
     strcpy(prefs_path, resource_path("prefs.bin"));
     if (access(prefs_path, R_OK | W_OK) != 0) {
-        char *prefs_dir = SDL_GetPrefPath("", "SameBoy");
+        char *prefs_dir = SDL_GetPrefPath("", "SameDuck");
         snprintf(prefs_path, sizeof(prefs_path) - 1, "%sprefs.bin", prefs_dir);
         SDL_free(prefs_dir);
     }
@@ -1293,7 +1295,7 @@ int main(int argc, char **argv)
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,
                 configuration.allow_background_controllers? "1" : "0");
 
-    window = SDL_CreateWindow("SameBoy v" GB_VERSION, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+    window = SDL_CreateWindow("SameDuck v" GB_VERSION, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               160 * configuration.default_scale, 144 * configuration.default_scale, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (window == NULL) {
         fputs(SDL_GetError(), stderr);

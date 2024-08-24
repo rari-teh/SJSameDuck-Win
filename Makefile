@@ -342,12 +342,12 @@ endif
 # Define our targets
 
 ifeq ($(PLATFORM),windows32)
-SDL_TARGET := $(BIN)/SDL/sameboy.exe $(BIN)/SDL/sameboy_debugger.exe $(BIN)/SDL/SDL2.dll
-TESTER_TARGET := $(BIN)/tester/sameboy_tester.exe
+SDL_TARGET := $(BIN)/SDL/sameduck.exe $(BIN)/SDL/sameduck_debugger.exe $(BIN)/SDL/SDL2.dll
+TESTER_TARGET := $(BIN)/tester/sameduck_tester.exe
 else
 # SDL_TARGET := $(BIN)/SDL/sameboy
-SDL_TARGET := $(BIN)/SDL/sameboy $(BIN)/SDL/sameboy_debugger
-TESTER_TARGET := $(BIN)/tester/sameboy_tester
+SDL_TARGET := $(BIN)/SDL/sameduck $(BIN)/SDL/sameduck_debugger
+TESTER_TARGET := $(BIN)/tester/sameduck_tester
 endif
 
 cocoa: $(BIN)/SameBoy.app
@@ -584,7 +584,7 @@ $(BIN)/XdgThumbnailer/sameboy-thumbnailer: $(CORE_OBJECTS) $(XDG_THUMBNAILER_OBJ
 # SDL Port
 
 # Unix versions build only one binary
-$(BIN)/SDL/sameboy: $(CORE_OBJECTS) $(SDL_OBJECTS)
+$(BIN)/SDL/sameduck: $(CORE_OBJECTS) $(SDL_OBJECTS)
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(FAT_FLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS)
 ifeq ($(CONF), release)
@@ -592,17 +592,17 @@ ifeq ($(CONF), release)
 	$(CODESIGN) $@
 endif
 
-$(BIN)/SDL/sameboy_debugger: $(CORE_OBJECTS) $(SDL_OBJECTS) #  $(OBJ)/Windows/resources.o
+$(BIN)/SDL/sameduck_debugger: $(CORE_OBJECTS) $(SDL_OBJECTS) #  $(OBJ)/Windows/resources.o
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) # -Wl,/subsystem:console
 
 
 # Windows version builds two, one with a conole and one without it
-$(BIN)/SDL/sameboy.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
+$(BIN)/SDL/sameduck.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) -Wl,/subsystem:windows
 
-$(BIN)/SDL/sameboy_debugger.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
+$(BIN)/SDL/sameduck_debugger.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) -Wl,/subsystem:console
 
@@ -627,7 +627,7 @@ $(BIN)/SDL/%.dll:
 
 # Tester
 
-$(BIN)/tester/sameboy_tester: $(CORE_OBJECTS) $(TESTER_OBJECTS)
+$(BIN)/tester/sameduck_tester: $(CORE_OBJECTS) $(TESTER_OBJECTS)
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS)
 ifeq ($(CONF), release)
@@ -635,7 +635,7 @@ ifeq ($(CONF), release)
 	$(CODESIGN) $@
 endif
 
-$(BIN)/tester/sameboy_tester.exe: $(CORE_OBJECTS) $(SDL_OBJECTS)
+$(BIN)/tester/sameduck_tester.exe: $(CORE_OBJECTS) $(SDL_OBJECTS)
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) -Wl,/subsystem:console
 

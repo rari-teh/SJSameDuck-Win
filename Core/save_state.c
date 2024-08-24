@@ -677,7 +677,7 @@ static int save_state_internal(GB_gameboy_t *gb, virtual_file_t *file, bool appe
     
     memcpy(bess_core.io_registers, gb->io_registers, sizeof(gb->io_registers));
     bess_core.io_registers[GB_IO_DIV] = gb->div_counter >> 8;
-    bess_core.io_registers[GB_IO_BANK] = gb->boot_rom_finished;
+    // bess_core.io_registers[GB_IO_BANK] = gb->boot_rom_finished;
     bess_core.io_registers[GB_IO_KEY1] |= gb->cgb_double_speed? 0x80 : 0;
     bess_core.hram.size = LE32(sizeof(gb->hram));
     bess_core.hram.offset = LE32(hram_offset + offsetof(GB_gameboy_t, hram) - GB_SECTION_OFFSET(hram));
@@ -1010,7 +1010,7 @@ static int load_bess_save(GB_gameboy_t *gb, virtual_file_t *file, bool is_samebo
                 
                 // Determines DMG mode
                 GB_write_memory(&save, 0xFF00 + GB_IO_KEY0, core.io_registers[GB_IO_KEY0]);
-                save.boot_rom_finished = core.io_registers[GB_IO_BANK];
+                // save.boot_rom_finished = core.io_registers[GB_IO_BANK];
                 GB_write_memory(&save, 0xFF00 + GB_IO_KEY1, core.io_registers[GB_IO_KEY1]);
                 if (save.cgb_mode) {
                     save.cgb_double_speed = core.io_registers[GB_IO_KEY1] & 0x80;
@@ -1234,7 +1234,9 @@ done:
     if (gb->sgb) {
         memset(gb->sgb, 0, sizeof(*gb->sgb));
         GB_sgb_load_default_data(gb);
-        if (gb->boot_rom_finished) {
+        // if (gb->boot_rom_finished) {
+        // Duck has no boot ROM
+        if (true) {
             gb->sgb->intro_animation = GB_SGB_INTRO_ANIMATION_LENGTH;
             if (!found_sgb) {
                 gb->sgb->disable_commands = true;

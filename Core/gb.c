@@ -154,6 +154,9 @@ GB_gameboy_t *GB_alloc(void)
 
 GB_gameboy_t *GB_init(GB_gameboy_t *gb, GB_model_t model)
 {
+    // Force DMG model
+    model = GB_MODEL_DMG_B;
+
     memset(gb, 0, sizeof(*gb));
     gb->model = model;
     if (GB_is_cgb(gb)) {
@@ -181,7 +184,7 @@ GB_gameboy_t *GB_init(GB_gameboy_t *gb, GB_model_t model)
     gb->data_bus_decay = 12;
     
     GB_reset(gb);
-    load_default_border(gb);
+    // load_default_border(gb);
     return gb;
 }
 
@@ -244,27 +247,34 @@ void GB_dealloc(GB_gameboy_t *gb)
 
 int GB_load_boot_rom(GB_gameboy_t *gb, const char *path)
 {
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        GB_log(gb, "Could not open boot ROM: %s.\n", strerror(errno));
-        return errno;
-    }
-    fread(gb->boot_rom, sizeof(gb->boot_rom), 1, f);
-    fclose(f);
+    // No Duck Boot Rom
+
+    // FILE *f = fopen(path, "rb");
+    // if (!f) {
+    //     GB_log(gb, "Could not open boot ROM: %s.\n", strerror(errno));
+    //     return errno;
+    // }
+    // fread(gb->boot_rom, sizeof(gb->boot_rom), 1, f);
+    // fclose(f);
     return 0;
 }
 
 void GB_load_boot_rom_from_buffer(GB_gameboy_t *gb, const unsigned char *buffer, size_t size)
 {
-    if (size > sizeof(gb->boot_rom)) {
-        size = sizeof(gb->boot_rom);
-    }
-    memset(gb->boot_rom, 0xFF, sizeof(gb->boot_rom));
-    memcpy(gb->boot_rom, buffer, size);
+    // No Duck Boot Rom
+
+    // if (size > sizeof(gb->boot_rom)) {
+    //     size = sizeof(gb->boot_rom);
+    // }
+    // memset(gb->boot_rom, 0xFF, sizeof(gb->boot_rom));
+    // memcpy(gb->boot_rom, buffer, size);
 }
 
 void GB_borrow_sgb_border(GB_gameboy_t *gb)
 {
+    // No duck SGB
+    return;
+
     if (GB_is_sgb(gb)) return;
     if (gb->border_mode != GB_BORDER_ALWAYS) return;
     if (gb->tried_loading_sgb_border) return;
@@ -400,7 +410,7 @@ void GB_gbs_switch_track(GB_gameboy_t *gb, uint8_t track)
         }
     }
     
-    gb->boot_rom_finished = true;
+    // gb->boot_rom_finished = true;
     gb->a = track;
     if (gb->sgb) {
         gb->sgb->intro_animation = GB_SGB_INTRO_ANIMATION_LENGTH;
@@ -1406,7 +1416,8 @@ bool GB_is_inited(GB_gameboy_t *gb)
 
 bool GB_is_cgb(const GB_gameboy_t *gb)
 {
-    return gb->model >= GB_MODEL_CGB_0;
+    return false;
+    // return gb->model >= GB_MODEL_CGB_0;
 }
 
 bool GB_is_cgb_in_cgb_mode(GB_gameboy_t *gb)
@@ -1416,12 +1427,14 @@ bool GB_is_cgb_in_cgb_mode(GB_gameboy_t *gb)
 
 bool GB_is_sgb(GB_gameboy_t *gb)
 {
-    return (gb->model & ~GB_MODEL_PAL_BIT & ~GB_MODEL_NO_SFC_BIT) == GB_MODEL_SGB || (gb->model & ~GB_MODEL_NO_SFC_BIT) == GB_MODEL_SGB2;
+    return false;
+    // return (gb->model & ~GB_MODEL_PAL_BIT & ~GB_MODEL_NO_SFC_BIT) == GB_MODEL_SGB || (gb->model & ~GB_MODEL_NO_SFC_BIT) == GB_MODEL_SGB2;
 }
 
 bool GB_is_hle_sgb(GB_gameboy_t *gb)
 {
-    return (gb->model & ~GB_MODEL_PAL_BIT) == GB_MODEL_SGB || gb->model == GB_MODEL_SGB2;
+    return false;
+    // return (gb->model & ~GB_MODEL_PAL_BIT) == GB_MODEL_SGB || gb->model == GB_MODEL_SGB2;
 }
 
 void GB_set_turbo_mode(GB_gameboy_t *gb, bool on, bool no_frame_skip)
@@ -1640,44 +1653,47 @@ static void reset_ram(GB_gameboy_t *gb)
 
 static void request_boot_rom(GB_gameboy_t *gb)
 {
-    if (gb->boot_rom_load_callback) {
-        GB_boot_rom_t type = 0;
-        switch (gb->model) {
-            case GB_MODEL_DMG_B:
-                type = GB_BOOT_ROM_DMG;
-                break;
-            case GB_MODEL_MGB:
-                type = GB_BOOT_ROM_MGB;
-                break;
-            case GB_MODEL_SGB_NTSC:
-            case GB_MODEL_SGB_PAL:
-            case GB_MODEL_SGB_NTSC_NO_SFC:
-            case GB_MODEL_SGB_PAL_NO_SFC:
-                type = GB_BOOT_ROM_SGB;
-                break;
-            case GB_MODEL_SGB2:
-            case GB_MODEL_SGB2_NO_SFC:
-                type = GB_BOOT_ROM_SGB2;
-                break;
-            case GB_MODEL_CGB_0:
-                type = GB_BOOT_ROM_CGB_0;
-                break;
-            case GB_MODEL_CGB_A:
-            case GB_MODEL_CGB_B:
-            case GB_MODEL_CGB_C:
-            case GB_MODEL_CGB_D:
-                type = GB_BOOT_ROM_CGB;
-                break;
-            case GB_MODEL_CGB_E:
-                type = GB_BOOT_ROM_CGB_E;
-                break;
-            case GB_MODEL_AGB_A:
-            case GB_MODEL_GBP_A:
-                type = GB_BOOT_ROM_AGB;
-                break;
-        }
-        gb->boot_rom_load_callback(gb, type);
-    }
+    // No Duck Boot ROM
+    return;
+
+    // if (gb->boot_rom_load_callback) {
+    //     GB_boot_rom_t type = 0;
+    //     switch (gb->model) {
+    //         case GB_MODEL_DMG_B:
+    //             type = GB_BOOT_ROM_DMG;
+    //             break;
+    //         case GB_MODEL_MGB:
+    //             type = GB_BOOT_ROM_MGB;
+    //             break;
+    //         case GB_MODEL_SGB_NTSC:
+    //         case GB_MODEL_SGB_PAL:
+    //         case GB_MODEL_SGB_NTSC_NO_SFC:
+    //         case GB_MODEL_SGB_PAL_NO_SFC:
+    //             type = GB_BOOT_ROM_SGB;
+    //             break;
+    //         case GB_MODEL_SGB2:
+    //         case GB_MODEL_SGB2_NO_SFC:
+    //             type = GB_BOOT_ROM_SGB2;
+    //             break;
+    //         case GB_MODEL_CGB_0:
+    //             type = GB_BOOT_ROM_CGB_0;
+    //             break;
+    //         case GB_MODEL_CGB_A:
+    //         case GB_MODEL_CGB_B:
+    //         case GB_MODEL_CGB_C:
+    //         case GB_MODEL_CGB_D:
+    //             type = GB_BOOT_ROM_CGB;
+    //             break;
+    //         case GB_MODEL_CGB_E:
+    //             type = GB_BOOT_ROM_CGB_E;
+    //             break;
+    //         case GB_MODEL_AGB_A:
+    //         case GB_MODEL_GBP_A:
+    //             type = GB_BOOT_ROM_AGB;
+    //             break;
+    //     }
+    //     gb->boot_rom_load_callback(gb, type);
+    // }
 }
 
 static void GB_reset_internal(GB_gameboy_t *gb, bool quick)
@@ -1809,6 +1825,9 @@ void GB_quick_reset(GB_gameboy_t *gb)
 
 void GB_switch_model_and_reset(GB_gameboy_t *gb, GB_model_t model)
 {
+    // Force Duck model
+    model = GB_MODEL_DMG_B;
+
     GB_ASSERT_NOT_RUNNING(gb)
     gb->model = model;
     if (GB_is_cgb(gb)) {
@@ -1827,7 +1846,7 @@ void GB_switch_model_and_reset(GB_gameboy_t *gb, GB_model_t model)
 #endif
     GB_rewind_reset(gb);
     GB_reset(gb);
-    load_default_border(gb);
+    // load_default_border(gb);
 }
 
 void *GB_get_direct_access(GB_gameboy_t *gb, GB_direct_access_t access, size_t *size, uint16_t *bank)
@@ -1874,9 +1893,9 @@ void *GB_get_direct_access(GB_gameboy_t *gb, GB_direct_access_t access, size_t *
             *bank = 0;
             return &gb->io_registers;
         case GB_DIRECT_ACCESS_BOOTROM:
-            *size = GB_is_cgb(gb)? sizeof(gb->boot_rom) : 0x100;
+            *size = 0; // GB_is_cgb(gb)? sizeof(gb->boot_rom) : 0x100;
             *bank = 0;
-            return &gb->boot_rom;
+            return NULL; // &gb->boot_rom;
         case GB_DIRECT_ACCESS_OAM:
             *size = sizeof(gb->oam);
             *bank = 0;
@@ -1973,7 +1992,7 @@ unsigned GB_get_screen_height(GB_gameboy_t *gb)
 
 unsigned GB_get_player_count(GB_gameboy_t *gb)
 {
-    return GB_is_hle_sgb(gb)? gb->sgb->player_count : 1;
+    return 1; // GB_is_hle_sgb(gb)? gb->sgb->player_count : 1;
 }
 
 void GB_set_update_input_hint_callback(GB_gameboy_t *gb, GB_update_input_hint_callback_t callback)

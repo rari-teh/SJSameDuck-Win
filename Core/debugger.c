@@ -1405,7 +1405,7 @@ static unsigned should_break(GB_gameboy_t *gb, uint16_t addr, bool jump_to)
         struct GB_breakpoint_s *breakpoint = &gb->breakpoints[i];
         if (breakpoint->bank != (uint16_t)-1) {
             if (breakpoint->bank != bank) continue;
-            if (!gb->boot_rom_finished) continue;
+            //if (!gb->boot_rom_finished) continue;
         }
         if (breakpoint->is_jump_to != jump_to) continue;
         if (addr < breakpoint->addr) continue;

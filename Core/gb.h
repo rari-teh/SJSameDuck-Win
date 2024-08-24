@@ -230,6 +230,128 @@ enum {
     GB_IO_PCM34     = 0x77, // Channels 3 and 4 amplitudes
 };
 
+// Duck IO Register Map
+enum {
+    DUCK_IO_JOYP = 0x00,
+    DUCK_IO_SB = 0x01,
+    DUCK_IO_SC = 0x02,
+    DUCK_IO_DIV = 0x04,
+    DUCK_IO_TIMA = 0x05,
+    DUCK_IO_TMA = 0x06,
+    DUCK_IO_TAC = 0x07,
+    DUCK_IO_IF = 0x0F,
+
+    DUCK_IO_LCDC = 0x10,
+    DUCK_IO_STAT = 0x11,
+    DUCK_IO_SCY = 0x12,
+    DUCK_IO_SCX = 0x13,
+    DUCK_IO_OBP0 = 0x14,
+    DUCK_IO_OBP1 = 0x15,
+    DUCK_IO_WY = 0x16,
+    DUCK_IO_WX = 0x17,
+    DUCK_IO_LY = 0x18,
+    DUCK_IO_LYC = 0x19,
+    DUCK_IO_DMA = 0x1A,
+    DUCK_IO_BGP = 0x1B,
+
+    DUCK_IO_NR10 = 0x20,
+    DUCK_IO_NR12 = 0x21,
+    DUCK_IO_NR11 = 0x22,
+    DUCK_IO_NR13 = 0x23,
+    DUCK_IO_NR14 = 0x24,
+    DUCK_IO_NR21 = 0x25,
+    DUCK_IO_NR22 = 0x27,
+    DUCK_IO_NR23 = 0x28,
+    DUCK_IO_NR24 = 0x29,
+    DUCK_IO_NR30 = 0x2A,
+    DUCK_IO_NR31 = 0x2B,
+    DUCK_IO_NR32 = 0x2C,
+    DUCK_IO_NR34 = 0x2D,
+    DUCK_IO_NR33 = 0x2E,
+    DUCK_IO_WAV_START = 0x30,
+    DUCK_IO_WAV_END = 0x3F,
+    DUCK_IO_NR41 = 0x40,
+    DUCK_IO_NR43 = 0x41,
+    DUCK_IO_NR42 = 0x42,
+    DUCK_IO_NR44 = 0x43,
+    DUCK_IO_NR50 = 0x44,
+    DUCK_IO_NR52 = 0x45,
+    DUCK_IO_NR51 = 0x46,
+
+    DUCK_IO_IE = 0xFF,
+};
+
+enum {
+    GB_NR32_VOL_MASK = 0b01100000,
+    GB_NR32_VOL_MUTE = 0b00000000,
+    GB_NR32_VOL_100  = 0b00100000,
+    GB_NR32_VOL_50   = 0b01000000,
+    GB_NR32_VOL_25   = 0b01100000,
+};
+
+enum {
+    DUCK_NR32_VOL_MASK = 0b01100000,
+    DUCK_NR32_VOL_MUTE = 0b00000000,
+    DUCK_NR32_VOL_25   = 0b00100000,
+    DUCK_NR32_VOL_50   = 0b01000000,
+    DUCK_NR32_VOL_100  = 0b01100000,
+};
+
+enum {
+    GB_LCDCF_OFF       = 0b00000000, /**< LCD Control: Off */
+    GB_LCDCF_ON        = 0b10000000, /**< LCD Control: On */
+    GB_LCDCF_WIN9800   = 0b00000000, /**< Window Tile Map: Use 9800 Region */
+    GB_LCDCF_WIN9C00   = 0b01000000, /**< Window Tile Map: Use 9C00 Region */
+    GB_LCDCF_WINOFF    = 0b00000000, /**< Window Display: Hidden */
+    GB_LCDCF_WINON     = 0b00100000, /**< Window Display: Visible */
+    GB_LCDCF_BG8800    = 0b00000000, /**< BG & Window Tile Data: Use 8800 Region */
+    GB_LCDCF_BG8000    = 0b00010000, /**< BG & Window Tile Data: Use 8000 Region */
+    GB_LCDCF_BG9800    = 0b00000000, /**< BG Tile Map: use 9800 Region */
+    GB_LCDCF_BG9C00    = 0b00001000, /**< BG Tile Map: use 9C00 Region */
+    GB_LCDCF_OBJ8      = 0b00000000, /**< Sprites Size: 8x8 pixels */
+    GB_LCDCF_OBJ16     = 0b00000100, /**< Sprites Size: 8x16 pixels */
+    GB_LCDCF_OBJOFF    = 0b00000000, /**< Sprites Display: Hidden */
+    GB_LCDCF_OBJON     = 0b00000010, /**< Sprites Display: Visible */
+    GB_LCDCF_BGOFF     = 0b00000000, /**< Background Display: Hidden */
+    GB_LCDCF_BGON      = 0b00000001, /**< Background Display: Visible */
+    GB_LCDCF_B_ON      = 7,          /**< Bit for LCD On/Off Select */
+    GB_LCDCF_B_WIN9C00 = 6,          /**< Bit for Window Tile Map Region Select */
+    GB_LCDCF_B_WINON   = 5,          /**< Bit for Window Display On/Off Control */
+    GB_LCDCF_B_BG8000  = 4,          /**< Bit for BG & Window Tile Data Region Select */
+    GB_LCDCF_B_BG9C00  = 3,          /**< Bit for BG Tile Map Region Select */
+    GB_LCDCF_B_OBJ16   = 2,          /**< Bit for Sprites Size Select */
+    GB_LCDCF_B_OBJON   = 1,          /**< Bit for Sprites Display Visible/Hidden Select */
+    GB_LCDCF_B_BGON    = 0,          /**< Bit for Background Display Visible/Hidden Select */
+};
+
+enum {
+    DUCK_LCDCF_OFF       = 0b00000000,
+    DUCK_LCDCF_ON        = 0b10000000,
+    DUCK_LCDCF_WIN9800   = 0b00000000,
+    DUCK_LCDCF_WIN9C00   = 0b00001000,
+    DUCK_LCDCF_WINOFF    = 0b00000000,
+    DUCK_LCDCF_WINON     = 0b00100000,
+    DUCK_LCDCF_BG8800    = 0b00000000,
+    DUCK_LCDCF_BG8000    = 0b00010000,
+    DUCK_LCDCF_BG9800    = 0b00000000,
+    DUCK_LCDCF_BG9C00    = 0b00000100,
+    DUCK_LCDCF_OBJ8      = 0b00000000,
+    DUCK_LCDCF_OBJ16     = 0b00000010,
+    DUCK_LCDCF_OBJOFF    = 0b00000000,
+    DUCK_LCDCF_OBJON     = 0b00000001,
+    DUCK_LCDCF_BGOFF     = 0b00000000,
+    DUCK_LCDCF_BGON      = 0b01000000,
+    DUCK_LCDCF_B_ON      = 7,
+    DUCK_LCDCF_B_WIN9C00 = 3,
+    DUCK_LCDCF_B_WINON   = 5,
+    DUCK_LCDCF_B_BG8000  = 4,
+    DUCK_LCDCF_B_BG9C00  = 2,
+    DUCK_LCDCF_B_OBJ16   = 1,
+    DUCK_LCDCF_B_OBJON   = 0,
+    DUCK_LCDCF_B_BGON    = 6,
+};
+
+
 typedef enum {
     GB_LOG_BOLD = 1,
     GB_LOG_DASHED_UNDERLINE = 2,
@@ -394,7 +516,7 @@ struct GB_gameboy_internal_s {
         bool cgb_double_speed;
         bool halted;
         bool stopped;
-        bool boot_rom_finished;
+        // bool boot_rom_finished;
         bool ime_toggle; /* ei has delayed a effect.*/
         bool halt_bug;
         bool just_halted;

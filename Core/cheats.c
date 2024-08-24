@@ -34,7 +34,7 @@ static uint16_t bank_for_addr(GB_gameboy_t *gb, uint16_t addr)
 
 static noinline void apply_cheat(GB_gameboy_t *gb, uint16_t address, uint8_t *value)
 {
-    if (unlikely(!gb->boot_rom_finished)) return;
+    // if (unlikely(!gb->boot_rom_finished)) return;
     const GB_cheat_hash_t *hash = gb->cheat_hash[hash_addr(address)];
     if (likely(!hash)) return;
     
