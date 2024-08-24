@@ -15,6 +15,10 @@ typedef struct {
         GB_HUC3,
         GB_TPP1,
         GB_CAMERA,
+        // Mega Duck
+        DUCK_SYSROM,
+        DUCK_MD1,
+        DUCK_MD2,
     } mbc_type;
     bool has_ram;
     bool has_battery;

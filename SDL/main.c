@@ -37,6 +37,8 @@ static SDL_GLContext gl_context = NULL;
 static bool console_supported = false;
 
 static bool workboy_text_input_mode = false;
+const char *mbc_string = NULL;
+
 
 bool uses_gl(void)
 {
@@ -938,6 +940,11 @@ restart:
     else {
         GB_init(&gb, model);
 
+        // MegaDuck: This needs to happen after GB_init() so overrides don't get wiped out
+        if (mbc_string) {
+            GB_set_forced_mbc(&gb, true, (uint8_t)strtol(mbc_string, NULL, 16));
+        }
+
         // Force workboy always on so it's present at startup
         GB_connect_workboy(&gb, (GB_workboy_set_time_callback)NULL, (GB_workboy_get_time_callback)NULL);
         
@@ -1199,6 +1206,7 @@ int main(int argc, char **argv)
     enable_smooth_scrolling();
 #endif
 
+    mbc_string = (char *)get_arg_option("--force-mbc", &argc, argv);
     const char *model_string = get_arg_option("--model", &argc, argv);
     bool fullscreen = get_arg_flag("--fullscreen", &argc, argv) || get_arg_flag("-f", &argc, argv);
     bool nogl = get_arg_flag("--nogl", &argc, argv);
@@ -1207,7 +1215,7 @@ int main(int argc, char **argv)
 
     if (argc > 2 || (argc == 2 && argv[1][0] == '-')) {
         fprintf(stderr, "SameDuck v" GB_VERSION "\n");
-        fprintf(stderr, "Usage: %s [--fullscreen|-f] [--nogl] [--stop-debugger|-s] [--model <model>] <rom>\n", argv[0]);
+        fprintf(stderr, "Usage: %s [--fullscreen|-f] [--nogl] [--stop-debugger|-s] [--model <model>] [--force-mbc <hex mbc number>] <rom>\n", argv[0]);
         exit(1);
     }
     
@@ -1284,7 +1292,7 @@ int main(int argc, char **argv)
     if (model_string) {
         handle_model_option(model_string);
     }
-    
+
     atexit(save_configuration);
     atexit(stop_recording);
     

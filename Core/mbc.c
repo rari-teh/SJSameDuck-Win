@@ -35,6 +35,10 @@ const GB_cartridge_t GB_cart_defs[256] = {
     {  GB_MBC5  , true , true , false, true }, // 1Eh  MBC5+RUMBLE+RAM+BATTERY
     [0x22] =
     {  GB_MBC7  , true,  true,  false, false}, // 22h  MBC7+ACCEL+EEPROM
+    [0xE0] =    // TODO: Does MegaDuck Laptop MBC have SRAM? Maybe only in Cart Slot form, but I don't have the cart
+    {  DUCK_SYSROM, false, false, false, false}, // E0h  MegaDuck Laptop System ROM MBC (32k banks)
+    {  DUCK_MD1 , false, false, false, false}, // E1h  MegaDuck MD 1 (32K banks)
+    {  DUCK_MD2 , false, false, false, false}, // E2h  MegaDuck MD 2 (16k banks)
     [0xFC] =
     {  GB_CAMERA, true , true , false, false}, // FCh  POCKET CAMERA
     {  GB_NO_MBC, false, false, false, false}, // FDh  BANDAI TAMA5 (Todo: Not supported)
@@ -150,6 +154,24 @@ void GB_update_mbc_mappings(GB_gameboy_t *gb)
             gb->mbc_ram_bank = gb->tpp1.ram_bank;
             gb->mbc_ram_enable = (gb->tpp1.mode == 2) || (gb->tpp1.mode == 3);
             break;
+
+        // MegaDuck 32K bank switching
+        case DUCK_SYSROM:
+            gb->mbc_rom0_bank =  gb->duck_sysrom.rom_bank * 2;
+            gb->mbc_rom_bank  = (gb->duck_sysrom.rom_bank * 2) + 1;
+            break;
+
+        // MegaDuck 32K bank switching
+        case DUCK_MD1:
+            gb->mbc_rom0_bank =  gb->duck_md1.rom_bank * 2;
+            gb->mbc_rom_bank  = (gb->duck_md1.rom_bank * 2) + 1;
+            break;
+
+        // MegaDuck 16K bank switching
+        case DUCK_MD2:
+            gb->mbc_rom_bank = gb->duck_md2.rom_bank;
+            break;
+
         nodefault;
     }
 }
@@ -157,7 +179,16 @@ void GB_update_mbc_mappings(GB_gameboy_t *gb)
 void GB_configure_cart(GB_gameboy_t *gb)
 {
     memset(GB_GET_SECTION(gb, mbc), 0, GB_SECTION_SIZE(mbc));
-    gb->cartridge_type = &GB_cart_defs[gb->rom[0x147]];
+
+    uint8_t mbc_num = gb->rom[0x147];
+    // MBC override for MegaDuck carts that lack a GB header
+    if (gb->forced_mbc)
+    {
+        mbc_num = gb->forced_mbc_num;
+    }
+    printf("MBC: 0x%02X %s\n", mbc_num, (gb->forced_mbc) ? "(Forced by CLI arg)" : "");
+    gb->cartridge_type = &GB_cart_defs[ mbc_num ];
+
     if (gb->cartridge_type->mbc_type == GB_MMM01) {
         uint8_t *temp = malloc(0x8000);
         memcpy(temp, gb->rom, 0x8000);
@@ -178,7 +209,8 @@ void GB_configure_cart(GB_gameboy_t *gb)
         }
     }
 
-    if (gb->rom[0x147] == 0xBC &&
+    // if (gb->rom[0x147] == 0xBC &&
+    if (mbc_num == 0xBC &&
         gb->rom[0x149] == 0xC1 &&
         gb->rom[0x14A] == 0x65) {
         static const GB_cartridge_t tpp1 = {GB_TPP1, true, true, true, true};
@@ -187,18 +219,25 @@ void GB_configure_cart(GB_gameboy_t *gb)
     }
     
     if (gb->cartridge_type->mbc_type != GB_MMM01) {
-        if (gb->rom[0x147] == 0 && gb->rom_size > 0x8000) {
+        // if (gb->rom[0x147] == 0 && gb->rom_size > 0x8000) {
+        if (mbc_num == 0 && gb->rom_size > 0x8000) {
             GB_log(gb, "ROM header reports no MBC, but file size is over 32Kb. Assuming cartridge uses MBC3.\n");
             gb->cartridge_type = &GB_cart_defs[0x11];
         }
-        else if (gb->rom[0x147] != 0 && memcmp(gb->cartridge_type, &GB_cart_defs[0], sizeof(GB_cart_defs[0])) == 0) {
-            GB_log(gb, "Cartridge type %02x is not yet supported.\n", gb->rom[0x147]);
+        // else if (gb->rom[0x147] != 0 && memcmp(gb->cartridge_type, &GB_cart_defs[0], sizeof(GB_cart_defs[0])) == 0) {
+        else if (mbc_num != 0 && memcmp(gb->cartridge_type, &GB_cart_defs[0], sizeof(GB_cart_defs[0])) == 0) {
+            // GB_log(gb, "Cartridge type %02x is not yet supported.\n", gb->rom[0x147]);
+            GB_log(gb, "Cartridge type %02x is not yet supported.\n", mbc_num);
         }
     }
-    
+
     if (!gb->cartridge_type->has_ram &&
         gb->cartridge_type->mbc_type != GB_NO_MBC &&
         gb->cartridge_type->mbc_type != GB_TPP1 &&
+        // MegaDuck carts don't have SRAM
+        gb->cartridge_type->mbc_type != DUCK_SYSROM &&
+        gb->cartridge_type->mbc_type != DUCK_MD1 &&
+        gb->cartridge_type->mbc_type != DUCK_MD2 &&
         gb->rom[0x149]) {
         GB_log(gb, "ROM header reports no RAM, but also reports a non-zero RAM size. Assuming cartridge has RAM.\n");
         gb->cartridge_type++;

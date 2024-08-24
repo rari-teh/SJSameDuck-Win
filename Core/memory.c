@@ -1005,6 +1005,26 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                     }
             }
             break;
+
+        case DUCK_SYSROM:
+            switch (addr & 0xF000) {
+                case 0x1000: gb->duck_md2.rom_bank  = value; break;
+            }
+            break;
+
+        // MegaDuck
+        case DUCK_MD1:
+            switch (addr & 0xF000) {
+                case 0xB000: gb->duck_md2.rom_bank  = value; break;
+            }
+            break;
+
+        case DUCK_MD2:
+            switch (addr & 0x0001) {
+                case 0x0001: gb->duck_md2.rom_bank  = value; break;
+            }
+            break;
+
             nodefault;
     }
     GB_update_mbc_mappings(gb);
@@ -1758,7 +1778,10 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                     GB_apu_write(gb, addr & 0xFF, value);
                     return;
                 }
-                GB_log(gb, "Wrote %02x to %04x (HW Register)\n", value, addr);
+                // MegaDuck likes to write to FF60, so don't spam debugger about it
+                if ((addr & 0xFF) != 0x60) {
+                    GB_log(gb, "Wrote %02x to %04x (HW Register)\n", value, addr);
+                }
                 return;
         }
     }

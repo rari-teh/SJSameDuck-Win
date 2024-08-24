@@ -638,6 +638,20 @@ struct GB_gameboy_internal_s {
                uint8_t ram_bank;
                uint8_t mode;
            } tpp1;
+
+            // MegaDuck
+            struct {
+                uint8_t rom_bank;
+            } duck_sysrom;  // MBC 0xE0
+
+            struct {
+                uint8_t rom_bank;
+            } duck_md1;  // MBC 0xE1
+
+            struct {
+                uint8_t rom_bank;
+            } duck_md2;  // MBC 0xE2
+
         };
         uint8_t rumble_strength;
         bool cart_ir;
@@ -949,6 +963,8 @@ struct GB_gameboy_internal_s {
         GB_rumble_mode_t rumble_mode;
         uint32_t rumble_on_cycles;
         uint32_t rumble_off_cycles;
+        bool forced_mbc;
+        uint8_t forced_mbc_num;
                
         /* Temporary state */
         bool wx_just_changed;
@@ -1043,6 +1059,7 @@ GB_registers_t *GB_get_registers(GB_gameboy_t *gb);
 void *GB_get_user_data(GB_gameboy_t *gb);
 void GB_set_user_data(GB_gameboy_t *gb, void *data);
 
+void GB_set_forced_mbc(GB_gameboy_t *gb, bool on, uint8_t mbc_num);
 int GB_load_boot_rom(GB_gameboy_t *gb, const char *path);
 void GB_load_boot_rom_from_buffer(GB_gameboy_t *gb, const unsigned char *buffer, size_t size);
 int GB_load_rom(GB_gameboy_t *gb, const char *path);

@@ -1616,6 +1616,9 @@ static bool mbc(GB_gameboy_t *gb, char *arguments, char *modifiers, const debugg
                 [GB_HUC1]   = "HUC-1",
                 [GB_HUC3]   = "HUC-3",
                 [GB_CAMERA] = "MAC-GBD",
+                [DUCK_SYSROM] = "DUCK_SYSROM",
+                [DUCK_MD1] = "DUCK_MD1",
+                [DUCK_MD2] = "DUCK_MD2",
 
             };
             GB_log(gb, "%s\n", mapper_names[cartridge->mbc_type]);
@@ -1652,6 +1655,8 @@ static bool mbc(GB_gameboy_t *gb, char *arguments, char *modifiers, const debugg
     if (cartridge->has_rtc) {
         GB_log(gb, "Cart contains a real time clock\n");
     }
+    GB_log(gb, "Current mapped ROM bank: %x\n", gb->mbc_rom_bank);
+    GB_log(gb, "Current mapped ROM0 bank: %x\n", gb->mbc_rom0_bank);
 
     return true;
 }
