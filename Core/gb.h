@@ -29,6 +29,7 @@ extern "C" {
 #include "cheats.h"
 #include "rumble.h"
 #include "workboy.h"
+#include "megaduck_laptop.h"
 #include "random.h"
 
 #define GB_STRUCT_VERSION 15
@@ -467,6 +468,7 @@ typedef GB_ENUM(uint8_t, {
     GB_ACCESSORY_NONE,
     GB_ACCESSORY_PRINTER,
     GB_ACCESSORY_WORKBOY,
+    GB_ACCESSORY_MEGADUCK_LAPTOP,
 }) GB_accessory_t;
 
 /* When state saving, each section is dumped independently of other sections.
@@ -793,6 +795,7 @@ struct GB_gameboy_internal_s {
         union {
             GB_printer_t printer;
             GB_workboy_t workboy;
+            GB_megaduck_laptop_t megaduck_laptop;
         };
     )
 
@@ -873,6 +876,8 @@ struct GB_gameboy_internal_s {
         GB_printer_done_callback_t printer_done_callback;
         GB_workboy_set_time_callback workboy_set_time_callback;
         GB_workboy_get_time_callback workboy_get_time_callback;
+        GB_megaduck_laptop_set_time_callback megaduck_laptop_set_time_callback;
+        GB_megaduck_laptop_get_time_callback megaduck_laptop_get_time_callback;
         GB_execution_callback_t execution_callback;
         GB_lcd_line_callback_t lcd_line_callback;
         GB_lcd_status_callback_t lcd_status_callback;

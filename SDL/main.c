@@ -15,6 +15,7 @@
 #include "console.h"
 
 #include "Core/workboy.h"
+#include "Core/megaduck_laptop.h"
 
 #ifndef _WIN32
 #include <fcntl.h>
@@ -36,8 +37,10 @@ static char *battery_save_path_ptr = NULL;
 static SDL_GLContext gl_context = NULL;
 static bool console_supported = false;
 
-static bool workboy_text_input_mode = false;
-const char *mbc_string = NULL;
+static bool peripheral_text_input_mode = false;  // For Workboy and MegaDuck Laptop
+static bool workboy_enabled = false;
+static bool megaduck_laptop_enabled = false;
+static char mbc_string[255] = "";
 
 
 bool uses_gl(void)
@@ -210,6 +213,8 @@ static void open_menu(void)
 }
 
 
+// TODO: split out to SDL/workboy_ui
+
 uint8_t workboy_SDLscancode_to_key(SDL_Event event) {
 
     switch (event.key.keysym.scancode) {
@@ -310,26 +315,46 @@ uint8_t workboy_SDLscancode_to_key(SDL_Event event) {
     return GB_WORKBOY_NONE;
 };
 
+uint8_t megaduck_laptop_SDLscancode_to_key(SDL_Event event) {
 
-static void workboy_handle_key_down(SDL_Event event) {
+    switch (event.key.keysym.scancode) {
+        case SDL_SCANCODE_0: return GB_WORKBOY_0;
+        // case SDL_SCANCODE_: return GB_WORKBOY_UMLAUT;
+        case SDL_SCANCODE_1: return GB_WORKBOY_1;
 
-    // if (GB_workboy_is_enabled(&gb)) {
-        uint8_t workboy_key = workboy_SDLscancode_to_key(event);
 
-        if (workboy_key != GB_WORKBOY_NONE) {
-            GB_workboy_set_key(&gb, workboy_key);
-        }
-    // }
+        default: return MEGADUCK_LAPTOP_KEY_NONE;
+    }
+
+    // Default no action
+    return MEGADUCK_LAPTOP_KEY_NONE;
+};
+
+
+static void peripheral_handle_key_down(SDL_Event event) {
+
+    if (workboy_enabled) {
+        // if (GB_workboy_is_enabled(&gb)) {
+        uint8_t key = workboy_SDLscancode_to_key(event);
+        if (key != GB_WORKBOY_NONE) GB_workboy_set_key(&gb, key);
+
+    } else if (megaduck_laptop_enabled) {
+
+        uint8_t key = megaduck_laptop_SDLscancode_to_key(event);
+        if (key != MEGADUCK_LAPTOP_KEY_NONE) GB_megaduck_laptop_set_key(&gb, key);
+    }
 }
 
 
-static void workboy_handle_key_up(SDL_Event event) {
+static void peripheral_handle_key_up(SDL_Event event) {
 
-    switch (event.key.keysym.scancode) {
-        case SDL_SCANCODE_LSHIFT: GB_workboy_set_key(&gb, GB_WORKBOY_SHIFT_UP); break;
-        case SDL_SCANCODE_RSHIFT: GB_workboy_set_key(&gb, GB_WORKBOY_SHIFT_UP); break;
+    if (workboy_enabled) {
+        switch (event.key.keysym.scancode) {
+            case SDL_SCANCODE_LSHIFT: GB_workboy_set_key(&gb, GB_WORKBOY_SHIFT_UP); break;
+            case SDL_SCANCODE_RSHIFT: GB_workboy_set_key(&gb, GB_WORKBOY_SHIFT_UP); break;
 
-        default: GB_workboy_set_key(&gb, GB_WORKBOY_NONE);
+            default: GB_workboy_set_key(&gb, GB_WORKBOY_NONE);
+        }
     }
 }
 
@@ -524,8 +549,8 @@ static void handle_events(GB_gameboy_t *gb)
             case SDL_KEYDOWN:
 
                 if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
-                    workboy_text_input_mode = !workboy_text_input_mode;
-                    if (workboy_text_input_mode) {
+                    peripheral_text_input_mode = !peripheral_text_input_mode;
+                    if (peripheral_text_input_mode) {
                         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy Input Mode: enabled. F12 to Exit", window);
                     } else {
                         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy Input Mode: disabled", window);
@@ -533,8 +558,8 @@ static void handle_events(GB_gameboy_t *gb)
                     continue;
                 } else {
                     // If workboy text input mode is enabled, capture all keys aside from the mode toggle key
-                    if (workboy_text_input_mode) {
-                        workboy_handle_key_down(event);
+                    if (peripheral_text_input_mode) {
+                        peripheral_handle_key_down(event);
                         continue;
                     }
                 }
@@ -627,8 +652,8 @@ static void handle_events(GB_gameboy_t *gb)
             case SDL_KEYUP: // Fallthrough
 
                 // If workboy text input mode is enabled, capture all key up events
-                if (workboy_text_input_mode) {
-                    workboy_handle_key_up(event);
+                if (peripheral_text_input_mode) {
+                    peripheral_handle_key_up(event);
                     continue;
                 }
 
@@ -941,12 +966,17 @@ restart:
         GB_init(&gb, model);
 
         // MegaDuck: This needs to happen after GB_init() so overrides don't get wiped out
-        if (mbc_string) {
+        if (strlen(mbc_string) > 0) {
             GB_set_forced_mbc(&gb, true, (uint8_t)strtol(mbc_string, NULL, 16));
         }
 
-        // Force workboy always on so it's present at startup
-        GB_connect_workboy(&gb, (GB_workboy_set_time_callback)NULL, (GB_workboy_get_time_callback)NULL);
+        if (workboy_enabled) {
+            GB_connect_workboy(&gb, (GB_workboy_set_time_callback)NULL, (GB_workboy_get_time_callback)NULL);
+            printf("* Workboy Attached. Use F12 to toggle keyboard input\n");
+        } else if (megaduck_laptop_enabled) {
+            GB_connect_megaduck_laptop(&gb, (GB_megaduck_laptop_set_time_callback)NULL, (GB_megaduck_laptop_get_time_callback)NULL);
+            printf("* MegaDuck Laptop Attached. Use F12 to toggle keyboard input\n");
+        }
         
         GB_set_boot_rom_load_callback(&gb, load_boot_rom);
         GB_set_vblank_callback(&gb, (GB_vblank_callback_t) vblank);
@@ -1206,19 +1236,29 @@ int main(int argc, char **argv)
     enable_smooth_scrolling();
 #endif
 
-    mbc_string = (char *)get_arg_option("--force-mbc", &argc, argv);
+    if (NULL != get_arg_option("--force-mbc", &argc, argv)) {
+        snprintf(mbc_string, sizeof(mbc_string), "%s", get_arg_option("--force-mbc", &argc, argv));
+    }
+    workboy_enabled         = get_arg_flag("--workboy", &argc, argv);
+    megaduck_laptop_enabled = get_arg_flag("--megaduck_laptop", &argc, argv);
+
     const char *model_string = get_arg_option("--model", &argc, argv);
     bool fullscreen = get_arg_flag("--fullscreen", &argc, argv) || get_arg_flag("-f", &argc, argv);
     bool nogl = get_arg_flag("--nogl", &argc, argv);
     stop_on_start = get_arg_flag("--stop-debugger", &argc, argv) || get_arg_flag("-s", &argc, argv);
-    
+
+
+    if (workboy_enabled && megaduck_laptop_enabled) {
+        fprintf(stderr, "Cannot have \"--workboy\" and \"--megaduck_laptop\" enabled at the same time\n");
+        exit(1);
+    }
 
     if (argc > 2 || (argc == 2 && argv[1][0] == '-')) {
         fprintf(stderr, "SameDuck v" GB_VERSION "\n");
-        fprintf(stderr, "Usage: %s [--fullscreen|-f] [--nogl] [--stop-debugger|-s] [--model <model>] [--force-mbc <hex mbc number>] <rom>\n", argv[0]);
+        fprintf(stderr, "Usage: %s [--fullscreen|-f] [--nogl] [--stop-debugger|-s] [--model <model>] [--force-mbc <hex mbc number>] [--workboy | --megaduck_laptop] <rom>\n", argv[0]);
         exit(1);
     }
-    
+
     if (argc == 2) {
         filename = argv[1];
     }
