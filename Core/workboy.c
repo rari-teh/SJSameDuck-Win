@@ -149,14 +149,15 @@ static void serial_start(GB_gameboy_t *gb, bool bit_received)
                 }
             }
         }
-#ifdef WORKBOY_SERIAL_LOGGING_ENABLED
-    #ifdef WORKBOY_SERIAL_LOG_ALL_IN_OUT
-        printf("WorkBoy  from-gb-RX:%02x(%c)  to-gb-TX:%02x(%c)  ( ROMB:%02x  PC:%04x )\n",
-            gb->workboy.byte_being_received, gb->workboy.byte_being_received,
-            gb->workboy.byte_to_send, gb->workboy.byte_to_send,
-            gb->mbc_rom_bank, gb->pc);
-    #endif
-#endif
+
+        #ifdef WORKBOY_SERIAL_LOGGING_ENABLED
+            #ifdef WORKBOY_SERIAL_LOG_ALL_IN_OUT
+                printf("WorkBoy  from-gb-RX:%02x(%c)  to-gb-TX:%02x(%c)  ( ROMB:%02x  PC:%04x )\n",
+                    gb->workboy.byte_being_received, gb->workboy.byte_being_received,
+                    gb->workboy.byte_to_send, gb->workboy.byte_to_send,
+                    gb->mbc_rom_bank, gb->pc);
+            #endif
+        #endif
 
         gb->workboy.bits_received = 0;
         gb->workboy.byte_being_received = 0;

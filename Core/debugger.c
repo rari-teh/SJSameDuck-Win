@@ -25,6 +25,9 @@ typedef struct {
 
 #define VALUE_16(x) ((value_t){false, 0, (x)})
 
+// Optional reduced debugger window spamming with less lines of asm when stepping
+#define DISASM_CONTEXT_SZ 1 // 5
+
 struct GB_breakpoint_s {
     unsigned id;
     union {
@@ -2502,7 +2505,7 @@ static void noinline debugger_run(GB_gameboy_t *gb)
             gb->help_shown = true;
             GB_log(gb, "Type 'help' to list the available debugger commands.\n");
         }
-        GB_cpu_disassemble(gb, gb->pc, 5);
+        GB_cpu_disassemble(gb, gb->pc, DISASM_CONTEXT_SZ);
     }
 next_command:
     if (input) {
@@ -2512,7 +2515,7 @@ next_command:
     if (gb->breakpoints && !gb->debug_stopped && (breakpoint_id = should_break(gb, gb->pc, false))) {
         GB_debugger_break(gb);
         GB_log(gb, "Breakpoint %u: PC = %s\n", breakpoint_id, value_to_string(gb, gb->pc, true, false));
-        GB_cpu_disassemble(gb, gb->pc, 5);
+        GB_cpu_disassemble(gb, gb->pc, DISASM_CONTEXT_SZ);
     }
 
     if (gb->breakpoints && !gb->debug_stopped) {
@@ -2523,7 +2526,7 @@ next_command:
         if (jump_to_result == JUMP_TO_BREAK) {
             GB_debugger_break(gb);
             GB_log(gb, "Jumping to breakpoint %u: %s\n", breakpoint_id, value_to_string(gb, address, true, false));
-            GB_cpu_disassemble(gb, gb->pc, 5);
+            GB_cpu_disassemble(gb, gb->pc, DISASM_CONTEXT_SZ);
             gb->non_trivial_jump_breakpoint_occured = false;
         }
         else if (gb->nontrivial_jump_state && (breakpoint_id = should_break(gb, gb->pc, true))) {
@@ -2535,7 +2538,7 @@ next_command:
                 GB_log(gb, "Jumping to breakpoint %u: %s\n", breakpoint_id, value_to_string(gb, gb->pc, true, false));
                 GB_load_state_from_buffer(gb, gb->nontrivial_jump_state, -1);
                 GB_rewind_push(gb);
-                GB_cpu_disassemble(gb, gb->pc, 5);
+                GB_cpu_disassemble(gb, gb->pc, DISASM_CONTEXT_SZ);
                 GB_debugger_break(gb);
             }
         }

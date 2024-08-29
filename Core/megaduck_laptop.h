@@ -8,14 +8,26 @@
 
 typedef struct {
     // Serial IO state and values
-    uint8_t byte_to_send;
-    bool bit_to_send;
-    uint8_t byte_being_received;
-    uint8_t bits_received;
+    uint8_t  byte_to_send;
+    bool     bit_to_send;
+    uint8_t  byte_being_received;
+    uint8_t  bits_received;
+
+    // External Clock mode states and values
+    int32_t t_states_till_update;
+    uint8_t  ext_clk_send_bit_counter;
+    uint16_t ext_clk_send_queue_size;
+    uint16_t ext_clk_send_queue_index;
+    uint8_t  ext_clk_send_queue[256];
 
     // Peripheral state
-    // uint8_t mode;
+    uint8_t state;
     uint8_t key;
+
+    // Power-On Init Counter state
+    uint8_t init_counter;
+
+    // uint8_t mode;
     // bool shift_down;
     // bool user_shift_down;
 
@@ -26,8 +38,296 @@ typedef struct {
 typedef void (*GB_megaduck_laptop_set_time_callback)(GB_gameboy_t *gb, time_t time);
 typedef time_t (*GB_megaduck_laptop_get_time_callback)(GB_gameboy_t *gb);
 
+
+
 enum {
-    MEGADUCK_LAPTOP_KEY_NONE = 0xFF, // TODO
+    // TODO:  = 1, <-- remove this so power on reset works as expected
+    // Init counter states
+    MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER = 1,      // Power-Up default state
+    MEGADUCK_SYS_STATE_INIT_2_SEND_RX_COUNT_ACK, // External Clock
+    MEGADUCK_SYS_STATE_INIT_3_WAIT_TX_COUNTER_REQ,
+    MEGADUCK_SYS_STATE_INIT_4_SEND_TX_COUNTER,   // External Clock
+    MEGADUCK_SYS_STATE_INIT_5_WAIT_TX_COUNT_ACK,
+    // Post-init default state
+    MEGADUCK_SYS_STATE_INITIAIZED_OK,
+    // Command reply states
+    MEGADUCK_SYS_STATE_REPLY_CMD_0x09_UNKNOWN,
+};
+
+enum {
+    MEGADUCK_SYS_INIT_COUNTER_RESET = 0,
+    MEGADUCK_SYS_INIT_COUNTER_DONE  = 255,
+};
+
+enum {
+    MEGADUCK_SYS_REPLY_BOOT_OK       = 0x01,
+    MEGADUCK_SYS_REPLY_BOOT_FAIL     = 0x00, // TODO: Not verified on hardware, assumed
+    MEGADUCK_SYS_REPLY_BOOT_END_OK   = 0x00, // Anything WITHOUT bit .0 set // TODO: Specific value not verified on hardware 
+    MEGADUCK_SYS_REPLY_BOOT_END_FAIL = 0x01, // Anything WITH    bit .0 set // TODO: Specific value not verified on hardware 
+
+    MEGADUCK_SYS_REPLY_CMD_INIT_UNKNOWN_0x09 = 0xFF, // TODO: Not verified on hardware, need to snoop it
+};
+
+enum {
+    MEGADUCK_SYS_CMD_READ_KEYS_MAYBE    = 0x00u,
+    MEGADUCK_SYS_CMD_KBD_START          = 0x00u,
+
+    // Init commands
+    MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST   = 0x00u,
+    MEGADUCK_SYS_CMD_DONE_OR_OK         = 0x01u,
+    MEGADUCK_SYS_CMD_ABORT_OR_FAIL      = 0x04u,
+
+    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09  = 0x09u,
+};
+
+ // In T-States, approximately 8192 Hz to match normal speed serial link with external clock
+//
+// 1. Clock~Dots per Sec 4194304 / 70224 T-States per Frame = 59.72750057 Frames per Sec
+// 2. Clock~Dots per Sec 4194304 /  Serial 8192 Hz = ~512 T-States per Serial Clock
+// 3. 70224 T-States per Frame   / 512 T-States per Serial Clock = 137.15625 Serial Clocks per Frame
+//
+enum {
+    MEGADUCK_LAPTOP_TICK_COUNT_RESET = 512,
+    // The System ROM has a built-in ~1 msec delay after most transmits before
+    // it enables externally driven serial transfers and turns on it's SIO interrupt handler.
+    // So any serial replies before that minimum time get discarded / are lost
+    //
+    // Maybe it's to allow for an optional reply/cancel from the System ROM between transmits?
+    //
+    // Min additional delay seems to be 3 serial clocks -> 0.36 msec : ((3 serial clocks / 8192 hz) × 1000 msec) = 0.36 msec
+    // Using 4 (0.48 msec) for now so there is more margin for error
+    //
+    // TODO: Measure what this tends to be on hardware with a test ROM
+    MEGADUCK_LAPTOP_TICK_COUNT_TX_DELAY = (512 * 4),
+
+    MEGADUCK_LAPTOP_EXT_CLOCK_SEND_INDEX_RESET = 0,
+};
+
+enum {
+    MEGADUCK_KBD_CODE_NONE = 0x00, // TODO
+
+    // ; RX Bytes for Keyboard Serial Reply
+    // ; - 1st:
+    // ;   -  Always 0x04 (Length)
+    // ; - 2nd:
+    // ;    - KEY REPEAT : |= 0x01  (so far looks like with no key value set in 3rd Byte)
+    // ;    - CAPS_LOCK: |= 0x02
+    // ;    - SHIFT: |= 0x04
+    // ;    - LEFT_PRINTSCREEN: |= 0x08
+    // ; - 3rd:
+    // ;    - Carries the keyboard key scan code
+    // ;    - 0x00 when no key pressed
+    // ; - 4th:
+    // ;     - Two's complement checksum byte
+    // ;     - It should be: #4 == (((#1 + #2 + #3) XOR 0xFF) + 1) [two's complement]
+    // ;     - I.E: (#4 + #1 + #2 + #3) == 0x100 -> unsigned overflow -> 0x00
+    // ;
+    // ;
+    // ; - Left /right shift are shared
+    // ;
+    // ; Keyboard serial reply scan codes have different ordering than SYS_CHAR_* codes
+    // ; - They go diagonal down from upper left for the first *4* rows
+    // ; - The bottom 4 rows (including piano keys) are more varied
+    // ;
+    // ; LEFT_PRINTSCREEN 00 + modifier 0x08 ??? Right seems to have actual keycode
+
+
+
+    // ; Modifier Keys / Flags for RX Byte 2
+    // ;
+    // ; See input_key_modifier_flags__RAM_D027_
+    MEGADUCK_KBD_FLAG_KEY_REPEAT             =  0x01,
+    MEGADUCK_KBD_FLAG_KEY_REPEAT_BIT         =  0,
+    MEGADUCK_KBD_FLAG_CAPSLOCK               =  0x02,
+    MEGADUCK_KBD_FLAG_CAPSLOCK_BIT           =  1,
+    MEGADUCK_KBD_FLAG_SHIFT                  =  0x04,
+    MEGADUCK_KBD_FLAG_SHIFT_BIT              =  2,
+    // ; Right Print Screen seems to have actual scancode vs Left being in a flag
+    MEGADUCK_KBD_FLAG_PRINTSCREEN_LEFT       =  0x08,
+    MEGADUCK_KBD_FLAG_PRINTSCREEN_LEFT_BIT   =  3,
+
+
+    // ; RX Byte 3 Flags
+    // ; All valid keys seem to have bit 7 set (0x80+)
+    MEGADUCK_KBD_KEYCODE_BASE_BIT  =  7,
+    MEGADUCK_KBD_KEYCODE_BASE      =  0x80,
+
+    // ; First 4 rows (top of keyboard)  ~ 0x80 - 0xB7
+    // ;
+    // ; - For each row, most chars are +4 vs char to immediate left
+    // ;
+    // ; Starting values
+    // ; - Row 1: 0x80
+    // ; - Row 2: 0x81
+    // ; - Row 3: 0x82
+    // ; - Row 4: 0x83
+
+    // ; Row 1
+    MEGADUCK_KBD_CODE_F1                  =  0x80,
+    MEGADUCK_KBD_CODE_F2                  =  0x84,
+    MEGADUCK_KBD_CODE_F3                  =  0x88,
+    MEGADUCK_KBD_CODE_F4                  =  0x8C,
+    MEGADUCK_KBD_CODE_F5                  =  0x90,
+    MEGADUCK_KBD_CODE_F6                  =  0x94,
+    MEGADUCK_KBD_CODE_F7                  =  0x98,
+    MEGADUCK_KBD_CODE_F8                  =  0x9C,
+    MEGADUCK_KBD_CODE_F9                  =  0xA0,
+    MEGADUCK_KBD_CODE_F10                 =  0xA4,
+    MEGADUCK_KBD_CODE_F11                 =  0xA8,
+    MEGADUCK_KBD_CODE_F12                 =  0xAC,
+    // ; GAP at 0xB0 maybe Blank spot where F13 would be
+    // ; GAP at 0xB4 maybe ON Key?
+
+    // ; Row 2
+    MEGADUCK_KBD_CODE_ESCAPE              =  0x81,  //; Spanish label: Salida | German label: Esc,
+    MEGADUCK_KBD_CODE_1                   =  0x85,  //; Shift alt: !,
+    MEGADUCK_KBD_CODE_2                   =  0x89,  //; Shift alt: ",
+    MEGADUCK_KBD_CODE_3                   =  0x8D,  //; Shift alt: · (Spanish, mid-dot) | § (German, legal section),
+    MEGADUCK_KBD_CODE_4                   =  0x91,  //; Shift alt: $,
+    MEGADUCK_KBD_CODE_5                   =  0x95,  //; Shift alt: %,
+    MEGADUCK_KBD_CODE_6                   =  0x99,  //; Shift alt: &,
+    MEGADUCK_KBD_CODE_7                   =  0x9D,  //; Shift alt: /,
+    MEGADUCK_KBD_CODE_8                   =  0xA1,  //; Shift alt: (,
+    MEGADUCK_KBD_CODE_9                   =  0xA5,  //; Shift alt: ),
+    MEGADUCK_KBD_CODE_0                   =  0xA9,  //; Shift alt: \,
+    MEGADUCK_KBD_CODE_SINGLE_QUOTE        =  0xAD,  //; Shift alt: ? (Spanish) | German version: ß (eszett),
+    MEGADUCK_KBD_CODE_EXCLAMATION_FLIPPED =  0xB1,  //; Shift alt: ¿ (Spanish) | ` (German),  //; German version: ' (single quote?),
+    MEGADUCK_KBD_CODE_BACKSPACE           =  0xB5,  //; German label: Lösch,
+    // ; See Continued Row 2 below
+
+    // ; Row 3
+    MEGADUCK_KBD_CODE_HELP                =  0x82,  //; Spanish label: Ayuda | German label: Hilfe,
+    MEGADUCK_KBD_CODE_Q                   =  0x86,
+    MEGADUCK_KBD_CODE_W                   =  0x8A,
+    MEGADUCK_KBD_CODE_E                   =  0x8E,
+    MEGADUCK_KBD_CODE_R                   =  0x92,
+    MEGADUCK_KBD_CODE_T                   =  0x96,
+    MEGADUCK_KBD_CODE_Y                   =  0x9A,  //; German version: z,
+    MEGADUCK_KBD_CODE_U                   =  0x9E,
+    MEGADUCK_KBD_CODE_I                   =  0xA2,
+    MEGADUCK_KBD_CODE_O                   =  0xA6,
+    MEGADUCK_KBD_CODE_P                   =  0xAA,
+    MEGADUCK_KBD_CODE_BACKTICK            =  0xAE,  //; Shift alt: [ (Spanish, only shift mode works) | German version: Ü,
+    MEGADUCK_KBD_CODE_RIGHT_SQ_BRACKET    =  0xB2,  //; Shift alt: * | German version: · (mid-dot),
+    MEGADUCK_KBD_CODE_ENTER               =  0xB6,  //; Spanish label: Entra | German label: Ein-gabe,
+    // ; See Continued Row 3 below
+
+    // ; Row 4
+    // ; GAP at 0x83 maybe CAPS LOCK  (Spanish label: Mayuscula, German label: Groß)
+    MEGADUCK_KBD_CODE_A                   =  0x87,
+    MEGADUCK_KBD_CODE_S                   =  0x8B,
+    MEGADUCK_KBD_CODE_D                   =  0x8F,
+    MEGADUCK_KBD_CODE_F                   =  0x93,
+    MEGADUCK_KBD_CODE_G                   =  0x97,
+    MEGADUCK_KBD_CODE_H                   =  0x9B,
+    MEGADUCK_KBD_CODE_J                   =  0x9F,
+    MEGADUCK_KBD_CODE_K                   =  0xA3,
+    MEGADUCK_KBD_CODE_L                   =  0xA7,
+    MEGADUCK_KBD_CODE_N_TILDE             =  0xAB,  //; German version: ö,
+    MEGADUCK_KBD_CODE_U_UMLAUT            =  0xAF,  //; German version: ä,
+    MEGADUCK_KBD_CODE_O_OVER_LINE         =  0xB3,  //; º Masculine ordinal indicator (Spanish) | German version: #  | Shift alt: ª [Feminine ordinal indicator, A over line] (Spanish) | ^ (German),
+    // ; ? GAP at 0x87 ?
+
+
+    // ; Second 4 rows (bottom of keyboard) ~ 0x80 - 0xB7
+    // ;
+    // ; - For each row, most chars are +4 vs char to immediate left
+    // ;
+    // ; Starting values
+    // ; - Row 5: 0xB8
+    // ; - Row 6: 0xB9
+    // ; - Row 7: 0xBA
+    // ; - Row 8: 0xBB
+
+    // ; Row 5
+    MEGADUCK_KBD_CODE_Z                   =  0xB8,  //; German version: y,
+    MEGADUCK_KBD_CODE_X                   =  0xBC,
+    MEGADUCK_KBD_CODE_C                   =  0xC0,
+    MEGADUCK_KBD_CODE_V                   =  0xC4,
+    MEGADUCK_KBD_CODE_B                   =  0xC8,
+    MEGADUCK_KBD_CODE_N                   =  0xCC,
+    MEGADUCK_KBD_CODE_M                   =  0xD0,
+    MEGADUCK_KBD_CODE_COMMA               =  0xD4,  //; Shift alt: ;,
+    MEGADUCK_KBD_CODE_PERIOD              =  0xD8,  //; Shift alt: :,
+    MEGADUCK_KBD_CODE_DASH                =  0xDC,  //; Shift alt: _ | German version: @,
+    // ; See Continued Row 5 below
+    // ; Row 6 Continued (from below)
+    MEGADUCK_KBD_CODE_DELETE              =  0xE0,  //; *  Spanish label: Borrar | German label: Entf.,
+
+
+
+    // ; Encoding is less orderly below
+
+
+    // ; Row 6
+    MEGADUCK_KBD_CODE_SPACE               =  0xB9,  //; Spanish label: Espacio | German label (blank),
+    // ; Continued Row 5
+    MEGADUCK_KBD_CODE_LESS_THAN           =  0xBD,  //; Shift alt: >,
+    // ; Continued Row 6
+    MEGADUCK_KBD_CODE_PAGE_UP             =  0xC1,  //; Spanish label: Pg Arriba | German label: Zu-rück,
+    MEGADUCK_KBD_CODE_PAGE_DOWN           =  0xC5,  //; Spanish label: Pg Abajo | German label: Wei-ter,
+    MEGADUCK_KBD_CODE_MEMORY_MINUS        =  0xC9,
+    // ; Continued Row 5
+    MEGADUCK_KBD_CODE_MEMORY_PLUS         =  0xCD,
+    MEGADUCK_KBD_CODE_MEMORY_RECALL       =  0xD1,
+    MEGADUCK_KBD_CODE_SQUAREROOT          =  0xD5,
+    // ; ** 3x3 Arrow and Math Key area **
+    // ; Continued Row 6
+    MEGADUCK_KBD_CODE_MULTIPLY            =  0xD9,
+    MEGADUCK_KBD_CODE_ARROW_DOWN          =  0xDD,
+    MEGADUCK_KBD_CODE_MINUS               =  0xE1,
+    // ; Continued Row 3
+    MEGADUCK_KBD_CODE_ARROW_LEFT          =  0xE5,
+    MEGADUCK_KBD_CODE_EQUALS              =  0xE9,
+    MEGADUCK_KBD_CODE_ARROW_RIGHT         =  0xED,
+    // ; Continued Row 2
+    MEGADUCK_KBD_CODE_DIVIDE              =  0xE4,  //; German version: :,
+    MEGADUCK_KBD_CODE_ARROW_UP            =  0xE8,
+    MEGADUCK_KBD_CODE_PLUS                =  0xEC,
+
+    // ; Row 7
+    // ; Piano Sharp Keys
+    MEGADUCK_KBD_CODE_PIANO_DO_SHARP      =  0xBA,
+    MEGADUCK_KBD_CODE_PIANO_RE_SHARP      =  0xBE,
+    // ; GAP at 0xC2 where there is no key
+    MEGADUCK_KBD_CODE_PIANO_FA_SHARP      =  0xC6,
+    MEGADUCK_KBD_CODE_PIANO_SOL_SHARP     =  0xCA,
+    MEGADUCK_KBD_CODE_PIANO_LA_SHARP      =  0xCE,
+    // ; GAP at 0xD2 where there is no key
+    // ;
+    // ; Octave 2 maybe
+    MEGADUCK_KBD_CODE_PIANO_DO_2_SHARP    =  0xD6,
+    MEGADUCK_KBD_CODE_PIANO_RE_2_SHARP    =  0xDA,
+    // ; Row 6 Continued
+    MEGADUCK_KBD_CODE_PRINTSCREEN_RIGHT   =  0xDE,  //; German label: Druck (* Mixed in with piano keys),
+    // ; Row 7 Continued
+    MEGADUCK_KBD_CODE_PIANO_FA_2_SHARP    =  0xE2,
+    MEGADUCK_KBD_CODE_PIANO_SOL_2_SHARP   =  0xE6,
+    MEGADUCK_KBD_CODE_PIANO_LA_2_SHARP    =  0xEA,
+
+    // ; Row 8
+    // ; Piano Primary Keys
+    MEGADUCK_KBD_CODE_PIANO_DO            =  0xBB,
+    MEGADUCK_KBD_CODE_PIANO_RE            =  0xBF,
+    MEGADUCK_KBD_CODE_PIANO_MI            =  0xC3,
+    MEGADUCK_KBD_CODE_PIANO_FA            =  0xC7,
+    MEGADUCK_KBD_CODE_PIANO_SOL           =  0xCB,
+    MEGADUCK_KBD_CODE_PIANO_LA            =  0xCF,
+    MEGADUCK_KBD_CODE_PIANO_SI            =  0xD3,
+    MEGADUCK_KBD_CODE_PIANO_DO_2          =  0xD7,
+    MEGADUCK_KBD_CODE_PIANO_RE_2          =  0xDB,
+    MEGADUCK_KBD_CODE_PIANO_MI_2          =  0xEF,
+    MEGADUCK_KBD_CODE_PIANO_FA_2          =  0xE3,
+    MEGADUCK_KBD_CODE_PIANO_SOL_2         =  0xE7,
+    MEGADUCK_KBD_CODE_PIANO_LA_2          =  0xEB,
+    MEGADUCK_KBD_CODE_PIANO_SI_2          =  0xEF,
+
+    MEGADUCK_KBD_CODE_LAST_KEY            =  MEGADUCK_KBD_CODE_PIANO_SI_2,
+
+    // ; Special System Codes? 0xF0+
+    MEGADUCK_KBD_CODE_MAYBE_SYST_CODES_START  =  0xF0,
+    MEGADUCK_KBD_CODE_MAYBE_RX_NOT_A_KEY      =  0xF6,
+
 };
 
 
@@ -36,3 +336,5 @@ void GB_connect_megaduck_laptop(GB_gameboy_t *gb,
                         GB_megaduck_laptop_get_time_callback get_time_callback);
 bool GB_megaduck_laptop_is_enabled(GB_gameboy_t *gb);
 void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key);
+void GB_megaduck_laptop_reset(GB_gameboy_t *gb);
+void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles);

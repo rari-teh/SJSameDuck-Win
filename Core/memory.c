@@ -10,7 +10,7 @@ static void write_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck, uint8_t
 static uint8_t read_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck);
 
 // #define DEBUG_LOG_DUCK_TRANSLATED_IO
-
+#define DEBUG_LOG_DUCK_SERIAL_IO
 
 typedef enum {
     GB_BUS_MAIN, /* In DMG: Cart and RAM. In CGB: Cart only */
@@ -1437,6 +1437,10 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
             case GB_IO_OBP0:
             case GB_IO_OBP1:
             case GB_IO_SB:
+                #ifdef DEBUG_LOG_DUCK_SERIAL_IO
+                    if ((addr & 0xFF) == GB_IO_SB)
+                        GB_log(gb, "    * gb: write SB_reg: <- 0x%02x (PC=0x%04x)\n", value, gb->pc);
+                #endif
             case GB_IO_PSWX:
             case GB_IO_PSWY:
             case GB_IO_PSW:
@@ -1742,6 +1746,9 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
             /*  TODO: What happens when starting a transfer during external clock?
                 TODO: When a cable is connected, the clock of the other side affects "zombie" serial clocking */
             case GB_IO_SC:
+                #ifdef DEBUG_LOG_DUCK_SERIAL_IO
+                    GB_log(gb, "    * gb: write SC_reg: <- 0x%02x (PC=0x%04x)\n", value, gb->pc);
+                #endif
                 gb->serial_count = 0;
                 if (!gb->cgb_mode) {
                     value |= 2;
@@ -2156,7 +2163,7 @@ static void write_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck, uint8_t
     write_high_memory(gb, addr_gb, value_gb);
 
     #ifdef DEBUG_LOG_DUCK_TRANSLATED_IO
-        printf("# WR high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_duck: %02X -> value_gb: %02X\n",
+        GB_log(gb, "# WR high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_duck: %02X -> value_gb: %02X\n",
                 addr_duck, addr_gb, value_duck, value_gb);
     #endif
 }
@@ -2173,7 +2180,7 @@ static uint8_t read_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck) {
     uint8_t value_duck = translate_io_reg_value_gb_to_duck(addr_gb, value_gb);
 
     #ifdef DEBUG_LOG_DUCK_TRANSLATED_IO
-        printf("# RD high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_gb: %02X -> value_duck: %02X\n",
+        GB_log(gb, "# RD high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_gb: %02X -> value_duck: %02X\n",
                 addr_duck, addr_gb, value_gb, value_duck);
     #endif
 

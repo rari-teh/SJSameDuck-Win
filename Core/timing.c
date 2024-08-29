@@ -420,6 +420,17 @@ static void camera_run(GB_gameboy_t *gb, uint8_t cycles)
 }
 
 
+static void megaduck_laptop_peripheral_run(GB_gameboy_t *gb, uint8_t cycles)
+{
+    if (unlikely( !GB_megaduck_laptop_is_enabled(gb) )) return;
+
+    gb->megaduck_laptop.t_states_till_update -= cycles;
+    if (gb->megaduck_laptop.t_states_till_update <= 0) {
+        GB_megaduck_laptop_peripheral_update(gb, cycles);
+    }
+}
+
+
 void GB_advance_cycles(GB_gameboy_t *gb, uint8_t cycles)
 {
     if (unlikely(gb->speed_switch_countdown)) {
@@ -444,6 +455,7 @@ void GB_advance_cycles(GB_gameboy_t *gb, uint8_t cycles)
 
     timers_run(gb, cycles);
     camera_run(gb, cycles);
+    megaduck_laptop_peripheral_run(gb, cycles);
 
     if (unlikely(gb->speed_switch_halt_countdown)) {
         gb->speed_switch_halt_countdown -= cycles;

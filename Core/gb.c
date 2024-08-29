@@ -13,6 +13,8 @@
 #include "gb.h"
 
 
+#define LOG_SERIAL_IO_DETAILS
+
 void GB_attributed_logv(GB_gameboy_t *gb, GB_log_attributes attributes, const char *fmt, va_list args)
 {
     char *string = NULL;
@@ -1382,11 +1384,17 @@ void GB_serial_set_data_bit(GB_gameboy_t *gb, bool data)
 {
     if (!(gb->io_registers[GB_IO_SC] & 0x80)) {
         /* Serial disabled */
+        #ifdef LOG_SERIAL_IO_DETAILS
+            GB_log(gb, "  !!!! SC NOT Enabled!: Dropped serial write request while using internal clock. \n");
+        #endif
         return;
     }
 
     if (gb->io_registers[GB_IO_SC] & 1) {
         /* Internal Clock */
+        #ifdef LOG_SERIAL_IO_DETAILS
+            GB_log(gb, "  !!!! gb: Serial write request while using internal clock. \n");
+        #endif
         GB_log(gb, "Serial write request while using internal clock. \n");
         return;
     }
@@ -1398,6 +1406,9 @@ void GB_serial_set_data_bit(GB_gameboy_t *gb, bool data)
         gb->io_registers[GB_IO_IF] |= 8;
         gb->io_registers[GB_IO_SC] &= ~0x80;
         gb->serial_count = 0;
+        #ifdef LOG_SERIAL_IO_DETAILS
+            GB_log(gb, "<< gb(RX): Serial transferred 8 bits using internal clock: 0x%02x \n", gb->io_registers[GB_IO_SB]);
+        #endif
     }
 }
 
