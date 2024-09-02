@@ -792,10 +792,10 @@ static void check_attach_cli_peripherals(GB_gameboy_t *gb) {
 
     if (workboy_enabled) {
         GB_connect_workboy(gb, (GB_workboy_set_time_callback)NULL, (GB_workboy_get_time_callback)NULL);
-        printf("* Workboy Attached. Use F12 to toggle keyboard input\n");
+        GB_log(gb, "* Workboy Attached. Use F12 to toggle keyboard input\n");
     } else if (megaduck_laptop_enabled) {
         GB_connect_megaduck_laptop(gb, (GB_megaduck_laptop_set_time_callback)NULL, (GB_megaduck_laptop_get_time_callback)NULL);
-        printf("* MegaDuck Laptop Attached. Use F12 to toggle keyboard input\n");
+        GB_log(gb, "* MegaDuck Laptop Attached. Use F12 to toggle keyboard input\n");
     }
 }
 
@@ -1133,8 +1133,10 @@ int main(int argc, char **argv)
     enable_smooth_scrolling();
 #endif
 
-    if (NULL != get_arg_option("--force-mbc", &argc, argv)) {
-        snprintf(mbc_string, sizeof(mbc_string), "%s", get_arg_option("--force-mbc", &argc, argv));
+    const char *force_mbc_string = get_arg_option("--force-mbc", &argc, argv);
+    if (NULL != force_mbc_string) {
+        printf("--force? %s\n", force_mbc_string);
+        snprintf(mbc_string, sizeof(mbc_string), "%s", force_mbc_string);
     }
     workboy_enabled         = get_arg_flag("--workboy", &argc, argv);
     megaduck_laptop_enabled = get_arg_flag("--megaduck_laptop", &argc, argv);
