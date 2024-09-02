@@ -440,9 +440,9 @@ static void handle_events(GB_gameboy_t *gb)
                 if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
                     peripheral_text_input_mode = !peripheral_text_input_mode;
                     if (peripheral_text_input_mode) {
-                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy Input Mode: enabled. F12 to Exit", window);
+                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy/Duck Laptop Input Mode: enabled. F12 to Exit", window);
                     } else {
-                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy Input Mode: disabled", window);
+                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy/Duck Laptop Input Mode: disabled", window);
                     }
                     continue;
                 } else {
