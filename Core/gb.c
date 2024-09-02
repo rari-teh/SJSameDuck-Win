@@ -13,8 +13,6 @@
 #include "gb.h"
 
 
-#define LOG_SERIAL_IO_DETAILS
-
 void GB_attributed_logv(GB_gameboy_t *gb, GB_log_attributes attributes, const char *fmt, va_list args)
 {
     char *string = NULL;
@@ -1384,15 +1382,21 @@ void GB_serial_set_data_bit(GB_gameboy_t *gb, bool data)
 {
     if (!(gb->io_registers[GB_IO_SC] & 0x80)) {
         /* Serial disabled */
-        #ifdef LOG_SERIAL_IO_DETAILS
-            GB_log(gb, "  !!!!!!! SC NOT Enabled!: Dropped serial write request while using internal clock. \n");
+        #ifdef GB_LOG_SERIAL_IO_DETAILS
+            GB_log(gb, "  !!!!!!! SC NOT Enabled!: Dropped serial write request."
+                       " [State: %d, RX Counter: %d, EXT-queue: %d, Ticks: %d]"
+                       " (PC=0x%04x SC=0x%02x)\n",
+                   gb->megaduck_laptop.state, gb->megaduck_laptop.init_counter,
+                   gb->megaduck_laptop.ext_clk_send_queue_size, gb->megaduck_laptop.t_states_till_update,
+                   gb->pc, gb->io_registers[GB_IO_SC]);
+
         #endif
         return;
     }
 
     if (gb->io_registers[GB_IO_SC] & 1) {
         /* Internal Clock */
-        #ifdef LOG_SERIAL_IO_DETAILS
+        #ifdef GB_LOG_SERIAL_IO_DETAILS
             GB_log(gb, "  !!!!!!!\n");
         #endif
         GB_log(gb, "Serial write request while using internal clock. \n");
@@ -1406,7 +1410,7 @@ void GB_serial_set_data_bit(GB_gameboy_t *gb, bool data)
         gb->io_registers[GB_IO_IF] |= 8;
         gb->io_registers[GB_IO_SC] &= ~0x80;
         gb->serial_count = 0;
-        #ifdef LOG_SERIAL_IO_DETAILS
+        #ifdef GB_LOG_SERIAL_IO_DETAILS
             GB_log(gb, "<<- Serial Send to GB: 0x%02x\n", gb->io_registers[GB_IO_SB]);
         #endif
     }

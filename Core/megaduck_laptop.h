@@ -5,9 +5,12 @@
 #include <time.h>
 #include "defs.h"
 
-#define MEGADUCK_SYS_SERIAL_LOGGING_ENABLED
-#define MEGADUCK_SYS_SERIAL_LOG_ALL_IN_OUT
+// #define MEGADUCK_SYS_SERIAL_LOGGING_ENABLED
+// #define MEGADUCK_SYS_SERIAL_LOG_ALL_IN_OUT
+// #define MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
+// #define MEGADUCK_SYS_SERIAL_LOG_TX_BYTES
 
+// #define GB_LOG_SERIAL_IO_DETAILS
 
 #define MEGADUCK_BUF_SZ  256
 
@@ -28,6 +31,7 @@ typedef struct {
     // Peripheral state
     uint8_t state;
     uint8_t key;
+    uint8_t key_modifiers;
     struct tm tm_rtc_time;
 
     // Multi-byte buffers
@@ -68,7 +72,12 @@ enum {
     MEGADUCK_SYS_STATE_REPLY_CMD_0x09_UNKNOWN,
     // Multi-byte receive states
     MEGADUCK_SYS_STATE_CMD_SET_RTC,                    // External Clock (partial)
-    // MEGADUCK_SYS_STATE_READ_KEYS,
+    MEGADUCK_SYS_STATE_READ_KEYS_TX,                   // External Clock
+    MEGADUCK_SYS_STATE_READ_KEYS_WAIT_ACK,
+
+
+    MEGADUCK_SYS_POWER_ON_RESET  = MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER,
+    MEGADUCK_SYS_KEEP_INIT_RESET = MEGADUCK_SYS_STATE_INIT_OK_READY,
 };
 
 enum {
@@ -92,23 +101,27 @@ enum {
 
     MEGADUCK_SYS_REPLY_CMD_INIT_UNKNOWN_0x09 = 0xFF, // TODO: Not verified on hardware, need to snoop it
     MEGADUCK_SYS_REPLY_SEND_BUFFER_OK        = 0x03, // Verified
-    MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR = 06, // Still not sure what this signifies, but failure of some kind
+    MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR = 0x06, // Still not sure what this signifies, but failure of some kind
 
     MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_OK   = 0x01,
     MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_FAIL = 0x00, // TODO: Not verified on hardware, need to snoop it
+
+    MEGADUCK_SYS_REPLY_NO_CART_IN_SLOT  = 0x06,  // Maybe also some failure during serial IO multi-byte buffer send
+    MEGADUCK_SYS_REPLY_MAYBE_KBD_START  = 0x0E,  // Maybe 0x0E ... why 0x04 when logged? Reply at start of a 4 byte keyboard reply packet
+
 };
 
 
 enum {
     MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST      = 0x00,  // Value sent to request the 255..0 countdown sequence (be sent into the serial port)
-    MEGADUCK_SYS_CMD_READ_KEYS_MAYBE       = 0x00,  //
+    MEGADUCK_SYS_CMD_READ_KEYS             = 0x00,  // Requests a multi-byte buffer with keyboard data from Peripheral
     MEGADUCK_SYS_CMD_DONE_OR_OK            = 0x01,  // TODO: What does this do and why?
+    MEGADUCK_SYS_CMD_DONE_OR_OK_AND_SOMETHING = 0x81,  // TODO: Seen this as a keyboard poll done reply instead of 0x01 by the calculator app, not sure what the difference is
     MEGADUCK_SYS_CMD_ABORT_OR_FAIL         = 0x04,  // TODO: What does this do and why?
     MEGADUCK_SYS_CMD_RUN_CART_IN_SLOT      = 0x08,  //
     MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09     = 0x09,  //
     MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME = 0x0B,  // Sets Hardware RTC Date and Time using multi-byte buffer send/TX
-    MEGADUCK_SYS_CMD_RTC_GET_DATE_AND_TIME = 0x0C,  // Used in multi-byte buffer receive/RX
-
+    MEGADUCK_SYS_CMD_RTC_GET_DATE_AND_TIME = 0x0C,  // Requests a multi-byte buffer with RTC data from Peripheral
 };
 
 
@@ -139,6 +152,7 @@ enum {
     MEGADUCK_RTC_IDX_SEC   = 7,
 };
 
+
  // In T-States, approximately 8192 Hz to match normal speed serial link with external clock
 //
 // 1. Clock~Dots per Sec 4194304 / 70224 T-States per Frame = 59.72750057 Frames per Sec
@@ -163,40 +177,46 @@ enum {
     // Reply to command that initiated the buffer write requires 2+ msec delay for unknown reasons
     // (at least for buffer reads maybe extra delay for RTC latch or keyboard matrix scan on)
     MEGADUCK_LAPTOP_TICK_COUNT_RX_BUF_START = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2.5),  // TODO: Not verified on hardware, assumed based on System ROM
+    MEGADUCK_LAPTOP_TICK_COUNT_KBD_REPLY_START = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2.5),  // TODO: Not verified on hardware, assumed based on System ROM
+    MEGADUCK_LAPTOP_TICK_COUNT_KBD_REPLY_NEXT  = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2),    // TODO: Not verified on hardware, assumed based on System ROM
 
     MEGADUCK_LAPTOP_EXT_CLOCK_SEND_INDEX_RESET = 0,
 
 };
 
+
+// ; RX Bytes for Keyboard Serial Reply
+// ; - 1st:
+// ;   -  Always 0x04 (Length)
+// ; - 2nd:
+// ;    - KEY REPEAT : |= 0x01  (so far looks like with no key value set in 3rd Byte)
+// ;    - CAPS_LOCK: |= 0x02
+// ;    - SHIFT: |= 0x04
+// ;    - LEFT_PRINTSCREEN: |= 0x08
+// ; - 3rd:
+// ;    - Carries the keyboard key scan code
+// ;    - 0x00 when no key pressed
+// ; - 4th:
+// ;     - Two's complement checksum byte
+// ;     - It should be: #4 == (((#1 + #2 + #3) XOR 0xFF) + 1) [two's complement]
+// ;     - I.E: (#4 + #1 + #2 + #3) == 0x100 -> unsigned overflow -> 0x00
+// ;
+// ;
+// ; - Left /right shift are shared
+// ;
+// ; Keyboard serial reply scan codes have different ordering than SYS_CHAR_* codes
+// ; - They go diagonal down from upper left for the first *4* rows
+// ; - The bottom 4 rows (including piano keys) are more varied
+// ;
+// ; LEFT_PRINTSCREEN 00 + modifier 0x08 ??? Right seems to have actual keycode
 enum {
-    MEGADUCK_KBD_CODE_NONE = 0x00, // TODO
+    MEGADUCK_KBD_BUF_REPLY_LEN = 4,
 
-    // ; RX Bytes for Keyboard Serial Reply
-    // ; - 1st:
-    // ;   -  Always 0x04 (Length)
-    // ; - 2nd:
-    // ;    - KEY REPEAT : |= 0x01  (so far looks like with no key value set in 3rd Byte)
-    // ;    - CAPS_LOCK: |= 0x02
-    // ;    - SHIFT: |= 0x04
-    // ;    - LEFT_PRINTSCREEN: |= 0x08
-    // ; - 3rd:
-    // ;    - Carries the keyboard key scan code
-    // ;    - 0x00 when no key pressed
-    // ; - 4th:
-    // ;     - Two's complement checksum byte
-    // ;     - It should be: #4 == (((#1 + #2 + #3) XOR 0xFF) + 1) [two's complement]
-    // ;     - I.E: (#4 + #1 + #2 + #3) == 0x100 -> unsigned overflow -> 0x00
-    // ;
-    // ;
-    // ; - Left /right shift are shared
-    // ;
-    // ; Keyboard serial reply scan codes have different ordering than SYS_CHAR_* codes
-    // ; - They go diagonal down from upper left for the first *4* rows
-    // ; - The bottom 4 rows (including piano keys) are more varied
-    // ;
-    // ; LEFT_PRINTSCREEN 00 + modifier 0x08 ??? Right seems to have actual keycode
+};
 
-
+enum {
+    MEGADUCK_KBD_CODE_NONE  = 0x00,
+    MEGADUCK_KBD_FLAGS_NONE = 0x00,
 
     // ; Modifier Keys / Flags for RX Byte 2
     // ;
@@ -404,6 +424,7 @@ void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key);
 void GB_megaduck_laptop_reset(GB_gameboy_t *gb);
 void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles);
 
-void MD_power_on_reset(GB_megaduck_laptop_t * periph);
+void MD_periph_reset(GB_megaduck_laptop_t * periph, uint8_t target_state);
+
 void MD_enqueue_ext_clk_send(GB_megaduck_laptop_t * periph, uint8_t byte_to_enqueue);
 void MD_enqueue_ext_clk_send_finalize(GB_megaduck_laptop_t * periph);

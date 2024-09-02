@@ -14,19 +14,23 @@
 // 8192 Hz / 8 bits = 1024 Bytes per second / 1000 msec = 1.024 msec per byte
 
 
-
-void MD_power_on_reset(GB_megaduck_laptop_t * periph) {
+void MD_periph_reset(GB_megaduck_laptop_t * periph, uint8_t target_state) {
     periph->state                    = MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER;
     periph->init_counter             = MEGADUCK_SYS_INIT_COUNTER_RESET;
     periph->ext_clk_send_bit_counter = 0;
     periph->ext_clk_send_queue_size  = 0;
     periph->ext_clk_send_queue_index = 0;
+
+    periph->key           = MEGADUCK_KBD_CODE_NONE;
+    periph->key_modifiers = MEGADUCK_KBD_FLAGS_NONE;
 }
 
 
 // Add a byte to the external clock send queue (FIFO)
 void MD_enqueue_ext_clk_send(GB_megaduck_laptop_t * periph, uint8_t byte_to_enqueue) {
-    // printf("  ..  Periph: Enqueue 0x%02x as [%d]\n", byte_to_enqueue, periph->ext_clk_send_queue_size);
+    #ifdef MEGADUCK_SYS_SERIAL_LOG_TX_BYTES
+        printf("   ..  Periph: Enqueue 0x%02x as [%d]\n", byte_to_enqueue, periph->ext_clk_send_queue_size);
+    #endif
 
     if (periph->ext_clk_send_queue_size <= MEGADUCK_BUF_SZ)
         periph->ext_clk_send_queue[ periph->ext_clk_send_queue_size++ ] = byte_to_enqueue;
@@ -53,10 +57,10 @@ static void idle_handle_commands(GB_megaduck_laptop_t * periph) {
             MD_enqueue_ext_clk_send_finalize(periph);
             break;
 
-        // case MEGADUCK_SYS_CMD_READ_KEYS_MAYBE:
-        //     periph->state = MEGADUCK_SYS_STATE_READ_KEYS;
-        //     MD_send_buf_init(periph);
-        //     break;
+        case MEGADUCK_SYS_CMD_READ_KEYS:
+            periph->state = MEGADUCK_SYS_STATE_READ_KEYS_TX;
+            MD_keyboard_enqueue_reply(periph);
+            break;
 
         case MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME:
             periph->state = MEGADUCK_SYS_STATE_CMD_SET_RTC;
@@ -94,11 +98,16 @@ static void handle_received_byte(GB_megaduck_laptop_t * periph) {
             idle_handle_commands(periph);
             break;
 
-        // case MEGADUCK_SYS_STATE_READ_KEYS:
         case MEGADUCK_SYS_STATE_CMD_SET_RTC:
             // Other multi-byte commands could call through to here
             // Replies handled via periph_megaduck_laptop_peripheral_update()
             MD_receive_buf(periph);
+            break;
+
+        case MEGADUCK_SYS_STATE_READ_KEYS_TX:
+             // Fall through, System ROM might try to interrupt keyboard reply at any time in sequence if it fails
+        case MEGADUCK_SYS_STATE_READ_KEYS_WAIT_ACK:
+            MD_keyboard_handle_tx_reply(periph);
             break;
     }
 }
@@ -162,7 +171,7 @@ void GB_connect_megaduck_laptop(GB_gameboy_t *gb,
     gb->megaduck_laptop_get_time_callback = get_time_callback;
     gb->accessory = GB_ACCESSORY_MEGADUCK_LAPTOP;
 
-    MD_power_on_reset(&gb->megaduck_laptop);
+    MD_periph_reset(&gb->megaduck_laptop, MEGADUCK_SYS_POWER_ON_RESET);
 }
 
 
@@ -179,7 +188,7 @@ void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key) {
 
 
 void GB_megaduck_laptop_reset(GB_gameboy_t *gb) {
-    MD_power_on_reset(&gb->megaduck_laptop);
+    MD_periph_reset(&gb->megaduck_laptop, MEGADUCK_SYS_POWER_ON_RESET);
 }
 
 
@@ -202,10 +211,10 @@ void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles) {
         // Send data 1 bit at a time
         bool tx_bit = (periph->ext_clk_send_queue[ periph->ext_clk_send_queue_index ] & 0x80) == 0x80;
 
-        // GB_log(gb, "  megaduck_laptop [EXT CLK] ** BIT SEND ** %d = %d (%02x) [queued: %d] {DIV:%04x}\n",
+        // GB_log(gb, "  megaduck_laptop [EXT CLK] ** BIT SEND ** %d = %d (%02x) [queued: %d] {DIV:%04x, PC=0x%04x, SC=0x%02x}\n",
         //     periph->ext_clk_send_bit_counter, tx_bit, periph->ext_clk_send_queue[ periph->ext_clk_send_queue_index ],
         //         periph->ext_clk_send_queue_size,
-        //         gb->div_counter);
+        //         gb->div_counter, gb->pc, gb->io_registers[GB_IO_SC]);
 
         if (periph->ext_clk_send_queue_index <= MEGADUCK_BUF_SZ)
             periph->ext_clk_send_queue[ periph->ext_clk_send_queue_index ] <<= 1;
@@ -256,11 +265,23 @@ void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles) {
                             periph->state = MEGADUCK_SYS_STATE_INIT_OK_READY;
                         }
                         break;
+
+                    case MEGADUCK_SYS_STATE_READ_KEYS_TX:
+                        // Last byte sent, now wait for acknowledgement
+                        periph->state = MEGADUCK_SYS_STATE_READ_KEYS_WAIT_ACK;
+                        break;
+
                 }
             } else {
                 // If there is another byte to send, reset and add a longer delay until next serial bit send
                 periph->ext_clk_send_queue_index++;  // TODO: could reset this inside ==0 block above once whole send buffer is done
-                periph->t_states_till_update = MEGADUCK_LAPTOP_TICK_COUNT_TX_DELAY;
+
+                if (periph->state == MEGADUCK_SYS_STATE_READ_KEYS_TX) {
+                    // Keyboard reply needs a longer delay between transmits
+                    periph->t_states_till_update = MEGADUCK_LAPTOP_TICK_COUNT_KBD_REPLY_NEXT;
+                } else {
+                    periph->t_states_till_update = MEGADUCK_LAPTOP_TICK_COUNT_TX_DELAY;
+                }
             }
 
             #ifdef MEGADUCK_SYS_SERIAL_LOGGING_ENABLED
@@ -269,9 +290,9 @@ void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles) {
                         // periph->ext_clk_send_queue_size + 1, periph->ext_clk_send_queue_size,
                         //  gb->mbc_rom0_bank, gb->mbc_rom_bank, gb->pc,
                         //  periph->state, periph->init_counter, periph->ext_clk_send_queue_size);
-                    GB_log(gb, "    - send done, queue %d -> %d  [State: %d, RX Counter: %d]\n",
+                    GB_log(gb, "    - send done, queue %d -> %d  [State: %d, RX Counter: %d, , Ticks: %d]\n",
                         periph->ext_clk_send_queue_size + 1, periph->ext_clk_send_queue_size,
-                        periph->state, periph->init_counter);
+                        periph->state, periph->init_counter, periph->t_states_till_update);
                 #endif
             #endif
 

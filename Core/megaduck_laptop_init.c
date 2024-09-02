@@ -98,7 +98,7 @@ void MD_init_stage_5_wait_tx_count_ack(GB_megaduck_laptop_t * periph) {
     // Failure, reset (System ROM will hang forever in busy loop at 0x0108 instead of retrying)
     else if (periph->byte_being_received == MEGADUCK_SYS_CMD_ABORT_OR_FAIL) {
         // TODO: for now assuming init failure results in a reset of the perihperhal
-        MD_power_on_reset(periph);
+        MD_periph_reset(periph, MEGADUCK_SYS_POWER_ON_RESET);
     }
 
     // TX/Reply byte is ignored by System ROM

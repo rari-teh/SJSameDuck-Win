@@ -48,7 +48,9 @@ void MD_receive_buf(GB_megaduck_laptop_t * periph) {
                 periph->rx_buffer_state = MEGADUCK_RX_BUF_5_FAIL;
                 MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR); // Implied by System ROM but not verified on hardware
             }
-            printf("*** RX BUFFER: size=%d (raw:0x%02x)\n", periph->rx_buffer_size, periph->rx_buffer_size + 2);
+            #ifdef MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
+                printf("*** RX BUFFER: size=%d (raw:0x%02x)\n", periph->rx_buffer_size, periph->rx_buffer_size + 2);
+            #endif
             MD_enqueue_ext_clk_send_finalize(periph);
             break;
 
@@ -74,11 +76,15 @@ void MD_receive_buf(GB_megaduck_laptop_t * periph) {
             // Then add all payload bytes
             uint8_t checksum_calc = (uint8_t)periph->rx_buffer_size + 2; // +1 for size byte and +1 for checksum byte
             for (int c = 0; c < periph->rx_buffer_size; c++) {
-                printf("rx buf [%d] = 0x%02x\n", c, periph->rx_buffer[c]);
+                #ifdef MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
+                    printf("rx buf [%d] = 0x%02x\n", c, periph->rx_buffer[c]);
+                #endif
                 checksum_calc += periph->rx_buffer[c];
             }
-            printf("rx buf checksum = 0x%02x, calc_checksum 2's comp = 0x%02x, calc_checksum raw = 0x%02x, size = %d\n",
-                periph->rx_buffer_checksum, (uint8_t)(~checksum_calc + 1), checksum_calc, periph->rx_buffer_size);
+            #ifdef MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
+                printf("rx buf checksum = 0x%02x, calc_checksum 2's comp = 0x%02x, calc_checksum raw = 0x%02x, size = %d\n",
+                    periph->rx_buffer_checksum, (uint8_t)(~checksum_calc + 1), checksum_calc, periph->rx_buffer_size);
+            #endif
 
             // Rx Checksum Byte should == (((sum of all bytes except checksum) XOR 0xFF) + 1) [two's complement]
             // so ((sum of received bytes including checksum byte) should == -> unsigned 8 bit overflow -> 0x00

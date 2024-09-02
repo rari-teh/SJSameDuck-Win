@@ -157,8 +157,12 @@ void GB_update_mbc_mappings(GB_gameboy_t *gb)
 
         // MegaDuck 32K bank switching
         case DUCK_SYSROM:
+            // GB_log(gb, " @ MBC.DUCK_SYSROM: write = 0x%02x [0: 0x%02x/ 1: 0x%02x",
+            //     gb->duck_sysrom.rom_bank, gb->mbc_rom0_bank, gb->mbc_rom_bank);
             gb->mbc_rom0_bank =  gb->duck_sysrom.rom_bank * 2;
             gb->mbc_rom_bank  = (gb->duck_sysrom.rom_bank * 2) + 1;
+            // GB_log(gb, " -> 0: 0x%02x/ 1: 0x%02x]\n",
+            //     gb->mbc_rom0_bank, gb->mbc_rom_bank);
             break;
 
         // MegaDuck 32K bank switching
