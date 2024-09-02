@@ -10,7 +10,7 @@ static void write_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck, uint8_t
 static uint8_t read_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck);
 
 // #define DEBUG_LOG_DUCK_TRANSLATED_IO
-#define DEBUG_LOG_DUCK_SERIAL_IO
+// #define DEBUG_LOG_DUCK_SERIAL_IO
 
 typedef enum {
     GB_BUS_MAIN, /* In DMG: Cart and RAM. In CGB: Cart only */

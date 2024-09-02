@@ -5,6 +5,11 @@
 #include <time.h>
 #include "defs.h"
 
+#define MEGADUCK_SYS_SERIAL_LOGGING_ENABLED
+#define MEGADUCK_SYS_SERIAL_LOG_ALL_IN_OUT
+
+
+#define MEGADUCK_BUF_SZ  256
 
 typedef struct {
     // Serial IO state and values
@@ -14,15 +19,25 @@ typedef struct {
     uint8_t  bits_received;
 
     // External Clock mode states and values
-    int32_t t_states_till_update;
+    int32_t  t_states_till_update;
     uint8_t  ext_clk_send_bit_counter;
     uint16_t ext_clk_send_queue_size;
     uint16_t ext_clk_send_queue_index;
-    uint8_t  ext_clk_send_queue[256];
+    uint8_t  ext_clk_send_queue[MEGADUCK_BUF_SZ];
 
     // Peripheral state
     uint8_t state;
     uint8_t key;
+    struct tm tm_rtc_time;
+
+    // Multi-byte buffers
+    uint8_t rx_buffer_state;
+    uint8_t rx_buffer_checksum;
+    uint8_t rx_buffer_purpose;
+    int     rx_buffer_size;
+    int     rx_buffer_count;
+    uint8_t rx_buffer[MEGADUCK_BUF_SZ];
+
 
     // Power-On Init Counter state
     uint8_t init_counter;
@@ -41,17 +56,27 @@ typedef time_t (*GB_megaduck_laptop_get_time_callback)(GB_gameboy_t *gb);
 
 
 enum {
-    // TODO:  = 1, <-- remove this so power on reset works as expected
     // Init counter states
-    MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER = 1,      // Power-Up default state
-    MEGADUCK_SYS_STATE_INIT_2_SEND_RX_COUNT_ACK, // External Clock
+    MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER = 1,    // Power-Up default state
+    MEGADUCK_SYS_STATE_INIT_2_SEND_RX_COUNT_ACK,      // External Clock
     MEGADUCK_SYS_STATE_INIT_3_WAIT_TX_COUNTER_REQ,
-    MEGADUCK_SYS_STATE_INIT_4_SEND_TX_COUNTER,   // External Clock
+    MEGADUCK_SYS_STATE_INIT_4_SEND_TX_COUNTER,        // External Clock
     MEGADUCK_SYS_STATE_INIT_5_WAIT_TX_COUNT_ACK,
     // Post-init default state
-    MEGADUCK_SYS_STATE_INITIAIZED_OK,
+    MEGADUCK_SYS_STATE_INIT_OK_READY,
     // Command reply states
     MEGADUCK_SYS_STATE_REPLY_CMD_0x09_UNKNOWN,
+    // Multi-byte receive states
+    MEGADUCK_SYS_STATE_CMD_SET_RTC,                    // External Clock (partial)
+    // MEGADUCK_SYS_STATE_READ_KEYS,
+};
+
+enum {
+    MEGADUCK_RX_BUF_1_LEN,
+    MEGADUCK_RX_BUF_2_PAYLOAD,
+    MEGADUCK_RX_BUF_3_CHECKSUM,
+    MEGADUCK_RX_BUF_4_DONE,
+    MEGADUCK_RX_BUF_5_FAIL
 };
 
 enum {
@@ -61,31 +86,66 @@ enum {
 
 enum {
     MEGADUCK_SYS_REPLY_BOOT_OK       = 0x01,
-    MEGADUCK_SYS_REPLY_BOOT_FAIL     = 0x00, // TODO: Not verified on hardware, assumed
+    MEGADUCK_SYS_REPLY_BOOT_FAIL     = 0x00, // TODO: Not verified on hardware, assumed based on System ROM
     MEGADUCK_SYS_REPLY_BOOT_END_OK   = 0x00, // Anything WITHOUT bit .0 set // TODO: Specific value not verified on hardware 
     MEGADUCK_SYS_REPLY_BOOT_END_FAIL = 0x01, // Anything WITH    bit .0 set // TODO: Specific value not verified on hardware 
 
     MEGADUCK_SYS_REPLY_CMD_INIT_UNKNOWN_0x09 = 0xFF, // TODO: Not verified on hardware, need to snoop it
+    MEGADUCK_SYS_REPLY_SEND_BUFFER_OK        = 0x03, // Verified
+    MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR = 06, // Still not sure what this signifies, but failure of some kind
+
+    MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_OK   = 0x01,
+    MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_FAIL = 0x00, // TODO: Not verified on hardware, need to snoop it
 };
 
+
 enum {
-    MEGADUCK_SYS_CMD_READ_KEYS_MAYBE    = 0x00u,
-    MEGADUCK_SYS_CMD_KBD_START          = 0x00u,
+    MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST      = 0x00,  // Value sent to request the 255..0 countdown sequence (be sent into the serial port)
+    MEGADUCK_SYS_CMD_READ_KEYS_MAYBE       = 0x00,  //
+    MEGADUCK_SYS_CMD_DONE_OR_OK            = 0x01,  // TODO: What does this do and why?
+    MEGADUCK_SYS_CMD_ABORT_OR_FAIL         = 0x04,  // TODO: What does this do and why?
+    MEGADUCK_SYS_CMD_RUN_CART_IN_SLOT      = 0x08,  //
+    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09     = 0x09,  //
+    MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME = 0x0B,  // Sets Hardware RTC Date and Time using multi-byte buffer send/TX
+    MEGADUCK_SYS_CMD_RTC_GET_DATE_AND_TIME = 0x0C,  // Used in multi-byte buffer receive/RX
 
-    // Init commands
-    MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST   = 0x00u,
-    MEGADUCK_SYS_CMD_DONE_OR_OK         = 0x01u,
-    MEGADUCK_SYS_CMD_ABORT_OR_FAIL      = 0x04u,
+};
 
-    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09  = 0x09u,
+
+// Set RTC command (From Duck -> Peripheral)
+//     Values shown are system power-up defaults
+//     All values are in BCD format
+//         Ex: Month = December = 12th month = 0x12 (NOT 0x0C)
+//     Command: (0x0B) SYS_CMD_RTC_SET_DATE_AND_TIME
+//     Buffer: 8 Bytes
+//         00: Year   : 94 (Year = 1900 + Date Byte in BCD 0x94) Quique Sys Range: 0x92 - 0x11 (1992 - 2011)
+//         01: Month  : 01 (January / Enero) TODO: Range: 0x01 - 0x12
+//         02: Day    : 01 (1st)
+//         03: DoW    : 06 (6th day of week: Saturday / Sabado) TODO: Range: 0x01 -0x07
+//         04: AM/PM  : 00 (AM) 0=AM, 1=PM- TODO: Verify
+//         05: Hour   : 00 (With above it's: 12 am) TODO: Range 0-11
+//         06: Minute : 00
+//         07: Second?: 00
+enum {
+    MEGADUCK_BUF_SZ_RTC = 8,  // 8 bytes YEAR/MON/DAT/DOW/AMPM/HOUR/MIN/SEC (size without len and checksum bytes)
+
+    MEGADUCK_RTC_IDX_YEAR  = 0,
+    MEGADUCK_RTC_IDX_MON   = 1,
+    MEGADUCK_RTC_IDX_DAY   = 2,
+    MEGADUCK_RTC_IDX_DOW   = 3,
+    MEGADUCK_RTC_IDX_AMPM  = 4,
+    MEGADUCK_RTC_IDX_HOUR  = 5,
+    MEGADUCK_RTC_IDX_MIN   = 6,
+    MEGADUCK_RTC_IDX_SEC   = 7,
 };
 
  // In T-States, approximately 8192 Hz to match normal speed serial link with external clock
 //
 // 1. Clock~Dots per Sec 4194304 / 70224 T-States per Frame = 59.72750057 Frames per Sec
-// 2. Clock~Dots per Sec 4194304 /  Serial 8192 Hz = ~512 T-States per Serial Clock
+// 2. Clock~Dots per Sec 4194304 / Serial 8192 Hz = ~512 T-States per Serial Clock
 // 3. 70224 T-States per Frame   / 512 T-States per Serial Clock = 137.15625 Serial Clocks per Frame
 //
+#define MEGADUCK_LAPTOP_TICK_DELAY_MSEC(MSECS) (((8192 * 512) / 1000) * MSECS)
 enum {
     MEGADUCK_LAPTOP_TICK_COUNT_RESET = 512,
     // The System ROM has a built-in ~1 msec delay after most transmits before
@@ -98,9 +158,14 @@ enum {
     // Using 4 (0.48 msec) for now so there is more margin for error
     //
     // TODO: Measure what this tends to be on hardware with a test ROM
-    MEGADUCK_LAPTOP_TICK_COUNT_TX_DELAY = (512 * 4),
+    MEGADUCK_LAPTOP_TICK_COUNT_TX_DELAY = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(0.48),
+
+    // Reply to command that initiated the buffer write requires 2+ msec delay for unknown reasons
+    // (at least for buffer reads maybe extra delay for RTC latch or keyboard matrix scan on)
+    MEGADUCK_LAPTOP_TICK_COUNT_RX_BUF_START = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2.5),  // TODO: Not verified on hardware, assumed based on System ROM
 
     MEGADUCK_LAPTOP_EXT_CLOCK_SEND_INDEX_RESET = 0,
+
 };
 
 enum {
@@ -338,3 +403,7 @@ bool GB_megaduck_laptop_is_enabled(GB_gameboy_t *gb);
 void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key);
 void GB_megaduck_laptop_reset(GB_gameboy_t *gb);
 void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles);
+
+void MD_power_on_reset(GB_megaduck_laptop_t * periph);
+void MD_enqueue_ext_clk_send(GB_megaduck_laptop_t * periph, uint8_t byte_to_enqueue);
+void MD_enqueue_ext_clk_send_finalize(GB_megaduck_laptop_t * periph);
