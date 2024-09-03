@@ -837,6 +837,10 @@ static void debugger_reload_callback(GB_gameboy_t *gb)
     replace_extension(filename, path_length, symbols_path, ".sym");
     GB_debugger_load_symbol_file(gb, symbols_path);
     
+    // This needs to be set before GB_reset() / GB_init()
+    if (megaduck_laptop_enabled) {
+        GB_megaduck_laptop_use_alt_initial_stack_value(gb);
+    }
     GB_reset(gb);
 
     check_attach_cli_peripherals(gb);
@@ -871,6 +875,11 @@ restart:
         }
     }
     else {
+
+        // This needs to be set before GB_reset() / GB_init()
+        if (megaduck_laptop_enabled) {
+            GB_megaduck_laptop_use_alt_initial_stack_value(&gb);
+        }
         GB_init(&gb, model);
 
         check_attach_cli_peripherals(&gb);
@@ -1135,7 +1144,6 @@ int main(int argc, char **argv)
 
     const char *force_mbc_string = get_arg_option("--force-mbc", &argc, argv);
     if (NULL != force_mbc_string) {
-        printf("--force? %s\n", force_mbc_string);
         snprintf(mbc_string, sizeof(mbc_string), "%s", force_mbc_string);
     }
     workboy_enabled         = get_arg_flag("--workboy", &argc, argv);

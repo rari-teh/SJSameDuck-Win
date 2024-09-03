@@ -10,9 +10,24 @@
 // #define MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
 // #define MEGADUCK_SYS_SERIAL_LOG_TX_BYTES
 
+#define MEGADUCK_SYS_KEYBOARD_LOG_SEND_NON_NULL
+
 // #define GB_LOG_SERIAL_IO_DETAILS
 
+// #define DEBUG_LOG_DUCK_TRANSLATED_IO
+// #define DEBUG_LOG_DUCK_SERIAL_IO
+
 #define MEGADUCK_BUF_SZ  256
+
+// Unlike the game boy which (reportedly) inits SP to 0x0000, the stack on MegaDuck is
+// different.
+// - On handhelds it seems to be random-ish at power-up
+// - On the laptop the System ROM seems to rely on it being 0xFFFE or equivalent since it
+//   does a call and ret (so pushes and pops the stack) before it even initializes it
+//   and that does not result in a crash on hardware as a value of 0x0000 would
+enum {
+    MEGADUCK_LAPTOP_INITIAL_STACK_VALUE = 0xFFFE,
+};
 
 typedef struct {
     // Serial IO state and values
@@ -419,6 +434,7 @@ enum {
 void GB_connect_megaduck_laptop(GB_gameboy_t *gb,
                         GB_megaduck_laptop_set_time_callback set_time_callback,
                         GB_megaduck_laptop_get_time_callback get_time_callback);
+void GB_megaduck_laptop_use_alt_initial_stack_value(GB_gameboy_t *gb);
 bool GB_megaduck_laptop_is_enabled(GB_gameboy_t *gb);
 void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key);
 void GB_megaduck_laptop_reset(GB_gameboy_t *gb);

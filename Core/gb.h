@@ -968,8 +968,11 @@ struct GB_gameboy_internal_s {
         GB_rumble_mode_t rumble_mode;
         uint32_t rumble_on_cycles;
         uint32_t rumble_off_cycles;
+
+        // Added for MegaDuck Fork
         bool forced_mbc;
-        uint8_t forced_mbc_num;
+        uint8_t  forced_mbc_num;
+        uint16_t use_megaduck_laptop_initial_sp;
                
         /* Temporary state */
         bool wx_just_changed;

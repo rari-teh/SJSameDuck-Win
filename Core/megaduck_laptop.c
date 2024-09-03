@@ -174,6 +174,10 @@ void GB_connect_megaduck_laptop(GB_gameboy_t *gb,
     MD_periph_reset(&gb->megaduck_laptop, MEGADUCK_SYS_POWER_ON_RESET);
 }
 
+void GB_megaduck_laptop_use_alt_initial_stack_value(GB_gameboy_t *gb) {
+    gb->use_megaduck_laptop_initial_sp = true;
+}
+
 
 bool GB_megaduck_laptop_is_enabled(GB_gameboy_t *gb) {
     return gb->accessory == GB_ACCESSORY_MEGADUCK_LAPTOP; // TODO:  && gb->megaduck_laptop.mode;

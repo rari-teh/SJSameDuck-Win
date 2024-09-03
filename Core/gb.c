@@ -156,6 +156,10 @@ GB_gameboy_t *GB_init(GB_gameboy_t *gb, GB_model_t model)
 {
     // Force DMG model
     model = GB_MODEL_DMG_B;
+    // MegaDuck: TODO: kind of a sloppy hack at the moment to work around
+    // config settings getting wiped in the memset below.
+    // Maybe just assign the laptop a Model number and be done with it?
+    bool cached_use_megaduck_laptop_initial_sp = gb->use_megaduck_laptop_initial_sp;
 
     memset(gb, 0, sizeof(*gb));
     gb->model = model;
@@ -182,7 +186,10 @@ GB_gameboy_t *GB_init(GB_gameboy_t *gb, GB_model_t model)
     }
     
     gb->data_bus_decay = 12;
-    
+
+    // Megaduck: Restore setting after struct wipe
+    gb->use_megaduck_laptop_initial_sp = cached_use_megaduck_laptop_initial_sp;
+
     GB_reset(gb);
     // load_default_border(gb);
     return gb;
@@ -1826,7 +1833,13 @@ static void GB_reset_internal(GB_gameboy_t *gb, bool quick)
         gb->io_registers[GB_IO_OBP1] = preserved_state->obp1;
     }
     gb->apu.apu_cycles_in_2mhz = true;
-    
+
+    // MegaDuck Laptop seems to have different power-on stack behavior,
+    // such that it can do CALLs and then RETs without crashing on a non-initialized stack
+    if (gb->use_megaduck_laptop_initial_sp) {
+        gb->sp = MEGADUCK_LAPTOP_INITIAL_STACK_VALUE;
+    }
+
     gb->magic = GB_state_magic();
     request_boot_rom(gb);
     GB_rewind_push(gb);
