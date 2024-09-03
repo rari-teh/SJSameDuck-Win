@@ -36,9 +36,9 @@ const GB_cartridge_t GB_cart_defs[256] = {
     [0x22] =
     {  GB_MBC7  , true,  true,  false, false}, // 22h  MBC7+ACCEL+EEPROM
     [0xE0] =    // TODO: Does MegaDuck Laptop MBC have SRAM? Maybe only in Cart Slot form, but I don't have the cart
-    {  DUCK_SYSROM, false, false, false, false}, // E0h  MegaDuck Laptop System ROM MBC (32k banks)
-    {  DUCK_MD1 , false, false, false, false}, // E1h  MegaDuck MD 1 (32K banks)
-    {  DUCK_MD2 , false, false, false, false}, // E2h  MegaDuck MD 2 (16k banks)
+    {  DUCK_SYSROM, false, false, false, false}, // E0h  MegaDuck Laptop System ROM MBC (32k bank size, reg addr 0x1000, range 0-15)
+    {  DUCK_MD1 , false, false, false, false},   // E1h  MegaDuck MD 1 (32K banks, reg addr 0xB000, range 0-1)
+    {  DUCK_MD2 , false, false, false, false},   // E2h  MegaDuck MD 2 (16k banks, reg addr 0x0001, range 1-3 or 1-7)
     [0xFC] =
     {  GB_CAMERA, true , true , false, false}, // FCh  POCKET CAMERA
     {  GB_NO_MBC, false, false, false, false}, // FDh  BANDAI TAMA5 (Todo: Not supported)
@@ -242,6 +242,7 @@ void GB_configure_cart(GB_gameboy_t *gb)
         gb->cartridge_type->mbc_type != DUCK_SYSROM &&
         gb->cartridge_type->mbc_type != DUCK_MD1 &&
         gb->cartridge_type->mbc_type != DUCK_MD2 &&
+
         gb->rom[0x149]) {
         GB_log(gb, "ROM header reports no RAM, but also reports a non-zero RAM size. Assuming cartridge has RAM.\n");
         gb->cartridge_type++;

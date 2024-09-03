@@ -272,13 +272,12 @@ static size_t bess_size_for_cartridge(const GB_cartridge_t *cart)
 
         // MegaDuck
         // Seems to be referring to the number of registers in the MBC itself to store
+        case DUCK_SYSROM:
+            return sizeof(BESS_block_t) + 1 * sizeof(BESS_MBC_pair_t);
         case DUCK_MD1:
             return sizeof(BESS_block_t) + 1 * sizeof(BESS_MBC_pair_t);
         case DUCK_MD2:
             return sizeof(BESS_block_t) + 1 * sizeof(BESS_MBC_pair_t);
-        case DUCK_SYSROM:
-            return sizeof(BESS_block_t) + 1 * sizeof(BESS_MBC_pair_t);
-
     }
 }
 
@@ -534,16 +533,16 @@ static int save_bess_mbc_block(GB_gameboy_t *gb, virtual_file_t *file)
             break;
 
         // MegaDuck
+        case DUCK_SYSROM:
+            pairs[1] = (BESS_MBC_pair_t){LE16(0x1000), gb->duck_sysrom.rom_bank};
+            mbc_block.size = 1 * sizeof(pairs[0]);
+            break;
         case DUCK_MD1:
             pairs[1] = (BESS_MBC_pair_t){LE16(0xB000), gb->duck_md1.rom_bank};
             mbc_block.size = 1 * sizeof(pairs[0]);
             break;
         case DUCK_MD2:
             pairs[1] = (BESS_MBC_pair_t){LE16(0x0001), gb->duck_md2.rom_bank};
-            mbc_block.size = 1 * sizeof(pairs[0]);
-            break;
-        case DUCK_SYSROM:
-            pairs[1] = (BESS_MBC_pair_t){LE16(0x1000), gb->duck_sysrom.rom_bank};
             mbc_block.size = 1 * sizeof(pairs[0]);
             break;
     }
