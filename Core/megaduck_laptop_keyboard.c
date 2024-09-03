@@ -5,6 +5,8 @@
 
 #include "megaduck_laptop_periph.h"
 
+// TODO: Needs better key coverage, modifier keys, repeat, etc
+
 // Enqueue keyboard reply data
 // [0]: Length of reply (always 4)
 // [1]: Keyboard modifier keys + left printscreen
@@ -16,9 +18,11 @@
 // [3]: checksum
 void MD_keyboard_enqueue_reply(GB_megaduck_laptop_t * periph) {
 
-    if (periph->key != MEGADUCK_KBD_CODE_NONE)
-         printf("       **** Sending keyboard reply **** (key: 0x%02x, key_mod: 0x%02x)\n",
-            periph->key, periph->key_modifiers);
+    #ifdef MEGADUCK_SYS_KEYBOARD_LOG_SEND_NON_NULL
+        if (periph->key != MEGADUCK_KBD_CODE_NONE)
+             printf("       **** Sending keyboard reply **** (key: 0x%02x, key_mod: 0x%02x)\n",
+                periph->key, periph->key_modifiers);
+    #endif
 
     MD_enqueue_ext_clk_send(periph, MEGADUCK_KBD_BUF_REPLY_LEN);
     MD_enqueue_ext_clk_send(periph, periph->key_modifiers);
