@@ -1,3 +1,23 @@
+
+# SuperJuniorSameDuck: 
+This is a work in progress! Mainly driven by development and testing needs.
+
+A fork of SameBoy with various patches for MegaDuck development and emulation.
+- Adds (currently partial) support for the MegaDuck Super Junior/Quique Laptop
+- Improved MegaDuck audio accuracy
+- SDL keyboard support for the existing Workboy emulation
+
+Added CLI flags:
+- `--megaduck_laptop`: Turn on  MegaDuck Super Junior/Quique Laptop emulation and SDL keyboard support (`F12` to toggle keyboard)
+  -  If running the System ROM then also use `--force-mbc 0xE0`
+- `--workboy`: Turn on Workboy emulation and SDL keyboard support (`F12` to toggle keyboard)
+- `--force-mbc <hex mbc number>`: Explicitly specify which MBC to use, do not use header or other detection. Allows using MegaDuck ROMs built for Game Boy MBCs (such as MBC5) as well as avoiding heuristics for other ROMs. 
+  - `0xE0`:  MegaDuck Laptop System ROM MBC (32k bank size, rom bank switch reg addr `0x1000`, range 0-15)
+  - `0xE1`:  MegaDuck MD 1 (32K banks, rom bank switch reg addr `0xB000`, range 0-1)
+  - `0xE2`:  MegaDuck MD 2 (16k banks, rom bank switch reg addr `0x0001`, range 1-3 or 1-7)-  
+
+# Original Repo Readme Below
+----------------
 # SameBoy
 
 SameBoy is an open source Game Boy (DMG) and Game Boy Color (CGB) emulator, written in portable C. It has a native Cocoa frontend for macOS, an SDL frontend for other operating systems, and a libretro core. It also includes a text-based debugger with an expression evaluator. Visit [the website](https://sameboy.github.io/).
