@@ -841,40 +841,44 @@ uint8_t GB_safe_read_memory(GB_gameboy_t *gb, uint16_t addr)
 
 static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
 {
+    bool write_handled = false;
+
     switch (gb->cartridge_type->mbc_type) {
         case GB_NO_MBC: return;
         case GB_MBC1:
             switch (addr & 0xF000) {
-                case 0x0000: case 0x1000: gb->mbc_ram_enable = (value & 0xF) == 0xA; break;
-                case 0x2000: case 0x3000: gb->mbc1.bank_low  = value; break;
-                case 0x4000: case 0x5000: gb->mbc1.bank_high = value; break;
-                case 0x6000: case 0x7000: gb->mbc1.mode      = value; break;
+                case 0x0000: case 0x1000: gb->mbc_ram_enable = (value & 0xF) == 0xA; write_handled = true; break;
+                case 0x2000: case 0x3000: gb->mbc1.bank_low  = value; write_handled = true; break;
+                case 0x4000: case 0x5000: gb->mbc1.bank_high = value; write_handled = true; break;
+                case 0x6000: case 0x7000: gb->mbc1.mode      = value; write_handled = true; break;
             }
             break;
         case GB_MBC2:
             switch (addr & 0x4100) {
-                case 0x0000: gb->mbc_ram_enable = (value & 0xF) == 0xA; break;
-                case 0x0100: gb->mbc2.rom_bank  = value; break;
+                case 0x0000: gb->mbc_ram_enable = (value & 0xF) == 0xA; write_handled = true; break;
+                case 0x0100: gb->mbc2.rom_bank  = value; write_handled = true; break;
             }
             break;
         case GB_MBC3:
             switch (addr & 0xF000) {
-                case 0x0000: case 0x1000: gb->mbc_ram_enable = (value & 0xF) == 0xA; break;
-                case 0x2000: case 0x3000: gb->mbc3.rom_bank  = value; break;
+                case 0x0000: case 0x1000: gb->mbc_ram_enable = (value & 0xF) == 0xA; write_handled = true; break;
+                case 0x2000: case 0x3000: gb->mbc3.rom_bank  = value; write_handled = true; break;
                 case 0x4000: case 0x5000:
                     gb->mbc3.ram_bank  = value;
                     gb->mbc3.rtc_mapped = value & 8;
+                    write_handled = true;
                     break;
                 case 0x6000: case 0x7000:
                     memcpy(&gb->rtc_latched, &gb->rtc_real, sizeof(gb->rtc_real));
+                    write_handled = true;
                     break;
             }
             break;
         case GB_MBC5:
             switch (addr & 0xF000) {
-                case 0x0000: case 0x1000: gb->mbc_ram_enable      = value == 0x0A; break;
-                case 0x2000:              gb->mbc5.rom_bank_low   = value; break;
-                case 0x3000:              gb->mbc5.rom_bank_high  = value; break;
+                case 0x0000: case 0x1000: gb->mbc_ram_enable      = value == 0x0A; write_handled = true; break;
+                case 0x2000:              gb->mbc5.rom_bank_low   = value; write_handled = true; break;
+                case 0x3000:              gb->mbc5.rom_bank_high  = value; write_handled = true; break;
                 case 0x4000: case 0x5000:
                     if (gb->cartridge_type->has_rumble) {
                         if (!!(value & 8) != !!gb->rumble_strength) {
@@ -883,6 +887,7 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                         value &= 7;
                     }
                     gb->mbc5.ram_bank = value;
+                    write_handled = true;
                     break;
             }
             break;
@@ -898,9 +903,9 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
             break;
         case GB_MBC7:
             switch (addr & 0xF000) {
-                case 0x0000: case 0x1000: gb->mbc_ram_enable             = value == 0x0A; break;
-                case 0x2000: case 0x3000: gb->mbc7.rom_bank              = value; break;
-                case 0x4000: case 0x5000: gb->mbc7.secondary_ram_enable  = value == 0x40; break;
+                case 0x0000: case 0x1000: gb->mbc_ram_enable             = value == 0x0A; write_handled = true; break;
+                case 0x2000: case 0x3000: gb->mbc7.rom_bank              = value; write_handled = true; break;
+                case 0x4000: case 0x5000: gb->mbc7.secondary_ram_enable  = value == 0x40; write_handled = true; break;
             }
             break;
         case GB_MMM01:
@@ -1005,25 +1010,34 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
 
         case DUCK_SYSROM:
             switch (addr & 0xF000) {
-                case 0x1000: gb->duck_md2.rom_bank  = value; break;
+                case 0x1000: gb->duck_md2.rom_bank  = value; write_handled = true; break;
             }
             break;
 
         // MegaDuck
         case DUCK_MD1:
             switch (addr & 0xF000) {
-                case 0xB000: gb->duck_md2.rom_bank  = value; break;
+                case 0xB000: gb->duck_md2.rom_bank  = value; write_handled = true; break;
             }
             break;
 
         case DUCK_MD2:
             switch (addr & 0x0001) {
-                case 0x0001: gb->duck_md2.rom_bank  = value; break;
+                case 0x0001: gb->duck_md2.rom_bank  = value; write_handled = true; break;
             }
             break;
 
             nodefault;
     }
+
+    #ifdef DEBUG_LOG_DUCK_UNHANDLED_0x7FFF_POSSIBLE_BANK_WRITES
+        if ((addr & 0x7FFFu) && (write_handled == false)) {
+            GB_log(gb, "Unhandled MBC Write: 0x%04X <- 0x%02X (PC=0x%04X)\n", addr, value, gb->pc);
+        }
+    #else
+        if (write_handled == false) { };
+    #endif
+
     GB_update_mbc_mappings(gb);
 }
 
@@ -1992,52 +2006,54 @@ void GB_hdma_run(GB_gameboy_t *gb)
 // START MegaDuck Register Address and Value translation
 // *****************************************************
 
-static uint16_t translate_io_addr_duck_to_gb(uint16_t duck_addr) {
+static uint16_t translate_io_addr_duck_to_gb(uint16_t addr_duck) {
 
-    uint8_t duck_addr_low = (duck_addr & 0xFF);
-    switch (duck_addr_low) {
-        // Equiv to GB_IO_NR10 -> GB_IO_NR52
-        case DUCK_IO_NR10: return (0xFF00 | GB_IO_NR10);
-        case DUCK_IO_NR11: return (0xFF00 | GB_IO_NR11);
-        case DUCK_IO_NR12: return (0xFF00 | GB_IO_NR12);
-        case DUCK_IO_NR13: return (0xFF00 | GB_IO_NR13);
-        case DUCK_IO_NR14: return (0xFF00 | GB_IO_NR14);
-        case DUCK_IO_NR21: return (0xFF00 | GB_IO_NR21);
-        case DUCK_IO_NR22: return (0xFF00 | GB_IO_NR22);
-        case DUCK_IO_NR23: return (0xFF00 | GB_IO_NR23);
-        case DUCK_IO_NR24: return (0xFF00 | GB_IO_NR24);
-        case DUCK_IO_NR30: return (0xFF00 | GB_IO_NR30);
-        case DUCK_IO_NR31: return (0xFF00 | GB_IO_NR31);
-        case DUCK_IO_NR32: return (0xFF00 | GB_IO_NR32);
-        case DUCK_IO_NR33: return (0xFF00 | GB_IO_NR33);
-        case DUCK_IO_NR34: return (0xFF00 | GB_IO_NR34);
-        // DUCK_IO_WAV_START (no change)
-        // DUCK_IO_WAV_END (no change)
-        case DUCK_IO_NR41: return (0xFF00 | GB_IO_NR41);
-        case DUCK_IO_NR42: return (0xFF00 | GB_IO_NR42);
-        case DUCK_IO_NR43: return (0xFF00 | GB_IO_NR43);
-        case DUCK_IO_NR44: return (0xFF00 | GB_IO_NR44);
-        case DUCK_IO_NR50: return (0xFF00 | GB_IO_NR50);
-        case DUCK_IO_NR51: return (0xFF00 | GB_IO_NR51);
-        case DUCK_IO_NR52: return (0xFF00 | GB_IO_NR52);
+    if ((addr_duck & 0xFF00) == 0xFF00) {
+        uint8_t addr_duck_low = (addr_duck & 0xFF);
+        switch (addr_duck_low) {
+            // Equiv to GB_IO_NR10 -> GB_IO_NR52
+            case DUCK_IO_NR10: return (0xFF00 | GB_IO_NR10);
+            case DUCK_IO_NR11: return (0xFF00 | GB_IO_NR11);
+            case DUCK_IO_NR12: return (0xFF00 | GB_IO_NR12);
+            case DUCK_IO_NR13: return (0xFF00 | GB_IO_NR13);
+            case DUCK_IO_NR14: return (0xFF00 | GB_IO_NR14);
+            case DUCK_IO_NR21: return (0xFF00 | GB_IO_NR21);
+            case DUCK_IO_NR22: return (0xFF00 | GB_IO_NR22);
+            case DUCK_IO_NR23: return (0xFF00 | GB_IO_NR23);
+            case DUCK_IO_NR24: return (0xFF00 | GB_IO_NR24);
+            case DUCK_IO_NR30: return (0xFF00 | GB_IO_NR30);
+            case DUCK_IO_NR31: return (0xFF00 | GB_IO_NR31);
+            case DUCK_IO_NR32: return (0xFF00 | GB_IO_NR32);
+            case DUCK_IO_NR33: return (0xFF00 | GB_IO_NR33);
+            case DUCK_IO_NR34: return (0xFF00 | GB_IO_NR34);
+            // DUCK_IO_WAV_START (no change)
+            // DUCK_IO_WAV_END (no change)
+            case DUCK_IO_NR41: return (0xFF00 | GB_IO_NR41);
+            case DUCK_IO_NR42: return (0xFF00 | GB_IO_NR42);
+            case DUCK_IO_NR43: return (0xFF00 | GB_IO_NR43);
+            case DUCK_IO_NR44: return (0xFF00 | GB_IO_NR44);
+            case DUCK_IO_NR50: return (0xFF00 | GB_IO_NR50);
+            case DUCK_IO_NR51: return (0xFF00 | GB_IO_NR51);
+            case DUCK_IO_NR52: return (0xFF00 | GB_IO_NR52);
 
-        // Equiv to GB_IO_LCDC -> GB_IO_WX
-        case DUCK_IO_LCDC: return (0xFF00 | GB_IO_LCDC);
-        case DUCK_IO_STAT: return (0xFF00 | GB_IO_STAT);
-        case DUCK_IO_SCY:  return (0xFF00 | GB_IO_SCY);
-        case DUCK_IO_SCX:  return (0xFF00 | GB_IO_SCX);
-        case DUCK_IO_OBP0: return (0xFF00 | GB_IO_OBP0);
-        case DUCK_IO_OBP1: return (0xFF00 | GB_IO_OBP1);
-        case DUCK_IO_WY:   return (0xFF00 | GB_IO_WY);
-        case DUCK_IO_WX:   return (0xFF00 | GB_IO_WX);
-        case DUCK_IO_LY:   return (0xFF00 | GB_IO_LY);
-        case DUCK_IO_LYC:  return (0xFF00 | GB_IO_LYC);
-        case DUCK_IO_DMA:  return (0xFF00 | GB_IO_DMA);
-        case DUCK_IO_BGP:  return (0xFF00 | GB_IO_BGP);
+            // Equiv to GB_IO_LCDC -> GB_IO_WX
+            case DUCK_IO_LCDC: return (0xFF00 | GB_IO_LCDC);
+            case DUCK_IO_STAT: return (0xFF00 | GB_IO_STAT);
+            case DUCK_IO_SCY:  return (0xFF00 | GB_IO_SCY);
+            case DUCK_IO_SCX:  return (0xFF00 | GB_IO_SCX);
+            case DUCK_IO_OBP0: return (0xFF00 | GB_IO_OBP0);
+            case DUCK_IO_OBP1: return (0xFF00 | GB_IO_OBP1);
+            case DUCK_IO_WY:   return (0xFF00 | GB_IO_WY);
+            case DUCK_IO_WX:   return (0xFF00 | GB_IO_WX);
+            case DUCK_IO_LY:   return (0xFF00 | GB_IO_LY);
+            case DUCK_IO_LYC:  return (0xFF00 | GB_IO_LYC);
+            case DUCK_IO_DMA:  return (0xFF00 | GB_IO_DMA);
+            case DUCK_IO_BGP:  return (0xFF00 | GB_IO_BGP);
+        }
     }
 
     // If not matched then return the address unchanged
-    return duck_addr;
+    return addr_duck;
 }
 
 
@@ -2115,15 +2131,17 @@ static inline uint8_t nr32_volume_swizzle_gb_to_duck(uint8_t value_gb) {
 // Expects IO address in ** DUCK ** mode
 static uint8_t translate_io_reg_value_duck_to_gb(uint16_t addr_duck, uint8_t value_duck) {
 
-    uint8_t addr_duck_low = (addr_duck & 0xFF);
-    switch (addr_duck_low) {
-        case DUCK_IO_NR12: return nybble_swap(value_duck);
-        case DUCK_IO_NR22: return nybble_swap(value_duck);
-        case DUCK_IO_NR32: return nr32_volume_swizzle_duck_to_gb(value_duck);
-        case DUCK_IO_NR43: return nybble_swap(value_duck);
-        case DUCK_IO_NR42: return nybble_swap(value_duck);
+    if ((addr_duck & 0xFF00) == 0xFF00) {
+        uint8_t addr_duck_low = (addr_duck & 0xFF);
+        switch (addr_duck_low) {
+            case DUCK_IO_NR12: return nybble_swap(value_duck);
+            case DUCK_IO_NR22: return nybble_swap(value_duck);
+            case DUCK_IO_NR32: return nr32_volume_swizzle_duck_to_gb(value_duck);
+            case DUCK_IO_NR43: return nybble_swap(value_duck);
+            case DUCK_IO_NR42: return nybble_swap(value_duck);
 
-        case DUCK_IO_LCDC: return lcdc_translate_value_duck_to_gb(value_duck);
+            case DUCK_IO_LCDC: return lcdc_translate_value_duck_to_gb(value_duck);
+        }
     }
 
     // If not matched then return the io reg read unchanged
@@ -2134,15 +2152,17 @@ static uint8_t translate_io_reg_value_duck_to_gb(uint16_t addr_duck, uint8_t val
 // Expects IO address in ** GB ** mode
 static uint8_t translate_io_reg_value_gb_to_duck(uint16_t addr_gb, uint8_t value_gb) {
 
-    uint8_t addr_gb_low = (addr_gb & 0xFF);
-    switch (addr_gb_low) {
-        case GB_IO_NR12: return nybble_swap(value_gb);
-        case GB_IO_NR22: return nybble_swap(value_gb);
-        case GB_IO_NR32: return nr32_volume_swizzle_gb_to_duck(value_gb);
-        case GB_IO_NR43: return nybble_swap(value_gb);
-        case GB_IO_NR42: return nybble_swap(value_gb);
+    if ((addr_gb & 0xFF00) == 0xFF00) {
+        uint8_t addr_gb_low = (addr_gb & 0xFF);
+        switch (addr_gb_low) {
+            case GB_IO_NR12: return nybble_swap(value_gb);
+            case GB_IO_NR22: return nybble_swap(value_gb);
+            case GB_IO_NR32: return nr32_volume_swizzle_gb_to_duck(value_gb);
+            case GB_IO_NR43: return nybble_swap(value_gb);
+            case GB_IO_NR42: return nybble_swap(value_gb);
 
-        case GB_IO_LCDC: return lcdc_translate_value_gb_to_duck(value_gb);
+            case GB_IO_LCDC: return lcdc_translate_value_gb_to_duck(value_gb);
+        }
     }
 
     // If not matched then return the io reg read unchanged
@@ -2160,8 +2180,10 @@ static void write_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck, uint8_t
     write_high_memory(gb, addr_gb, value_gb);
 
     #ifdef DEBUG_LOG_DUCK_TRANSLATED_IO
-        GB_log(gb, "# WR high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_duck: %02X -> value_gb: %02X\n",
-                addr_duck, addr_gb, value_duck, value_gb);
+        if (addr_duck & 0xFF00) {
+            GB_log(gb, "# WR high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_duck: %02X -> value_gb: %02X (@ 0x%04x)\n",
+                    addr_duck, addr_gb, value_duck, value_gb, gb->pc);
+        }
     #endif
 }
 
@@ -2177,8 +2199,10 @@ static uint8_t read_high_memory_duck(GB_gameboy_t *gb, uint16_t addr_duck) {
     uint8_t value_duck = translate_io_reg_value_gb_to_duck(addr_gb, value_gb);
 
     #ifdef DEBUG_LOG_DUCK_TRANSLATED_IO
-        GB_log(gb, "# RD high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_gb: %02X -> value_duck: %02X\n",
-                addr_duck, addr_gb, value_gb, value_duck);
+        if (addr_duck & 0xFF00) {
+            GB_log(gb, "# RD high_mem_duck: addr_duck: %04X -> addr_gb: %04X value_gb: %02X -> value_duck: %02X (@ 0x%04x)\n",
+                    addr_duck, addr_gb, value_gb, value_duck, gb->pc);
+        }
     #endif
 
     return value_duck;
