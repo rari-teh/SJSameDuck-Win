@@ -37,10 +37,10 @@ static void serial_start(GB_gameboy_t *gb, bool bit_received)
             gb->workboy.buffer_index = 1;
 
             // time_t time = gb->workboy_get_time_callback(gb);
-            time_t rawtime;
-            time(&rawtime);
-            struct tm tm;
-            tm = *localtime(&rawtime);
+                time_t rawtime;
+                time(&rawtime);
+                struct tm tm;
+                tm = *localtime(&rawtime);
             memset(gb->workboy.buffer, 0, sizeof(gb->workboy.buffer));
 
             gb->workboy.buffer[0] = 4; // Unknown, unused, but appears to be expected to be 4

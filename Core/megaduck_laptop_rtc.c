@@ -15,22 +15,83 @@ static inline uint8_t bcd_to_int(uint8_t i)
     return (i & 0xF) + (i >> 4) * 10;
 }
 
-// void MD_rtc_set_to_local_time(GB_megaduck_laptop_t * periph) {
 
-//     time_t rawtime;
-//     time(&rawtime);
-//     localtime_r(&rawtime, & periph->tm_rtc_time);
-// }
-
-
+// For Write to peripheral RTC (from Duck ROM perspective)
 void MD_rtc_set_from_buf(GB_megaduck_laptop_t * periph) {
 
     if (periph->rx_buffer_size == MEGADUCK_BUF_SZ_RTC) {
-        periph->tm_rtc_time.tm_sec  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_SEC]);
-        periph->tm_rtc_time.tm_min  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_MIN]);
-        periph->tm_rtc_time.tm_hour = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_HOUR]) + (periph->rx_buffer[MEGADUCK_RTC_IDX_AMPM] * 12);
-        // periph->tm_rtc_time.tm_mday = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_...]);
-        periph->tm_rtc_time.tm_mon  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_MON]) - 1;
-        periph->tm_rtc_time.tm_year =  (uint8_t)(periph->rx_buffer[MEGADUCK_RTC_IDX_YEAR]);
+        // printf("MD_rtc_set_from_buf()\n");
+
+        struct tm tm_rtc_time = {0};
+
+        // tm_year is in format N + 1900
+        int rtc_year = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_YEAR]);
+        if (rtc_year < 92) rtc_year += 100; // Shift to 2000's.       0x00 -> 0x91 = 2000 -> 2091
+                                            // Otherwise Leave as is. 0x92 -> 0x99 = 1992 -> 1999
+
+        tm_rtc_time.tm_year = rtc_year; // In BCD with a rollover to 00 at 2000. System ROM uses dates as old as 1992 (0x92)
+        tm_rtc_time.tm_mon  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_MON]) - 1;
+        tm_rtc_time.tm_mday = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_DAY]);
+        // MEGADUCK_RTC_IDX_DOW
+        tm_rtc_time.tm_hour = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_HOUR])
+                                              + (periph->rx_buffer[MEGADUCK_RTC_IDX_AMPM] * 12);
+        tm_rtc_time.tm_min  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_MIN]);
+        tm_rtc_time.tm_sec  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_SEC]);
+
+        // Use timegm() instead mktime() to avoid having to make sure the
+        // .tm_isdst (daylight savings flag) is set correctly (otherwise mktime() may add an hour)
+        periph->time_delta_rtc_vs_host = time(NULL) - timegm(&tm_rtc_time);
     }
+}
+
+
+// Get RTC command reply (Peripheral -> Duck)
+//     All values are in BCD format
+//         Ex: Month = December = 12th month = 0x12 (NOT 0x0C)
+// [0]: Length of reply (always 4)
+// [1..8] RTC Data
+// [9]: checksum
+void MD_rtc_enqueue_reply(GB_megaduck_laptop_t * periph) {
+
+    // RTC time ticking
+    // printf("MD_rtc_enqueue_reply()\n");
+
+    struct tm tm;
+
+    #ifdef MEGADUCK_SYS_FORCE_LOCAL_DATE_TIME_REPLY
+        // Ignore any transmitted RTC data and use local time
+        time_t rawtime;
+        time(&rawtime);
+        tm = *localtime(&rawtime);
+    #else
+        // Load previously set RTC data
+        time_t offset_time = time(NULL) - periph->time_delta_rtc_vs_host;
+
+        // Use gmtime() instead localtime() to avoid having to make sure the
+        // .tm_isdst (daylight savings flag) is set correctly (otherwise mktime() may add an hour)
+        tm = *gmtime(&offset_time);
+    #endif
+
+    MD_send_buf_enqueue(periph, MEGADUCK_RTC_BUF_REPLY_LEN);
+
+    if (tm.tm_year > (2000 - 1900))
+        MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_year - (2000 - 1900)));
+    else
+        MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_year)); // Years in BCD since 1900 (tm_year is already in since 1900 format)
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_mon + 1)   );
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_mday)      );
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_wday)      ); // DOW
+
+    MD_send_buf_enqueue(periph, int_to_bcd( (tm.tm_hour < 12) ? 0 : 1 )); // AMPM
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_hour % 12));
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_min)      );
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_sec)      );
+
+    MD_send_buf_calc_enqueue_checksum(periph);
+    MD_send_buf_finalize_and_transmit(periph);
+
+    // Override with longer delay for first reply byte
+    // since command that initiated the buffer requires 2+ msec delay
+    // for unknown reasons (maybe extra delay for RTC latch on reads?)
+    periph->t_states_till_update = MEGADUCK_LAPTOP_TICK_COUNT_TX_BUF_REPLY_START;
 }

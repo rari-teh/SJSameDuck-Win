@@ -420,12 +420,15 @@ static void camera_run(GB_gameboy_t *gb, uint8_t cycles)
 }
 
 
+// "cycles" param here in SameBoy looks like it means 4.n MHz T-States
 static void megaduck_laptop_peripheral_run(GB_gameboy_t *gb, uint8_t cycles)
 {
     if (unlikely( !GB_megaduck_laptop_is_enabled(gb) )) return;
 
     gb->megaduck_laptop.t_states_till_update -= cycles;
     if (gb->megaduck_laptop.t_states_till_update <= 0) {
+        // Called after 512 T-States have elapsed
+        // Roughly matches serial clock timing in GB "normal" speed
         GB_megaduck_laptop_peripheral_update(gb, cycles);
     }
 }

@@ -43,14 +43,14 @@ void MD_init_stage_1_rx_counter(GB_megaduck_laptop_t * periph) {
         if (periph->init_counter == MEGADUCK_SYS_INIT_COUNTER_DONE) {
             // Success: received counter bytes all matched expected increment
             periph->state = MEGADUCK_SYS_STATE_INIT_2_SEND_RX_COUNT_ACK;
-            MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_BOOT_OK);
-            MD_enqueue_ext_clk_send_finalize(periph);
+            MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_BOOT_OK);
+            MD_send_buf_finalize_and_transmit(periph);
         } else {
             // Failure: some counter bytes sent by System ROM either dropped or corrupted
             // TODO: What happens here is not really known yet, for now assuming it reverts to power-on Reset
             periph->state = MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER;
-            MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_BOOT_FAIL);
-            MD_enqueue_ext_clk_send_finalize(periph);
+            MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_BOOT_FAIL);
+            MD_send_buf_finalize_and_transmit(periph);
         }
     }
     else if (periph->init_counter == periph->byte_being_received) {
@@ -78,9 +78,9 @@ void MD_init_stage_3_wait_tx_count_request(GB_megaduck_laptop_t * periph) {
         // Load up 0..255 counter to send
         // It will get sent via GB_megaduck_laptop_peripheral_update()
         for (int c = MEGADUCK_SYS_INIT_COUNTER_DONE; c >= MEGADUCK_SYS_INIT_COUNTER_RESET; c--) {
-            MD_enqueue_ext_clk_send(periph, c);
+            MD_send_buf_enqueue(periph, c);
         }
-        MD_enqueue_ext_clk_send_finalize(periph);
+        MD_send_buf_finalize_and_transmit(periph);
     }
 
     // TX/Reply byte is ignored by System ROM

@@ -6,6 +6,7 @@
 #include "megaduck_laptop_periph.h"
 
 
+
 void MD_receive_buf_init(GB_megaduck_laptop_t * periph) {
 
     // Save request type as purpose of RX Buffer
@@ -15,8 +16,8 @@ void MD_receive_buf_init(GB_megaduck_laptop_t * periph) {
     periph->rx_buffer_size     = 0;
     periph->rx_buffer_count    = 0;
 
-    MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_OK);
-    MD_enqueue_ext_clk_send_finalize(periph);
+    MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_OK);
+    MD_send_buf_finalize_and_transmit(periph);
     // Override with longer delay for first reply byte
     // since command that initiated the buffer requires 2+ msec delay
     // for unknown reasons (maybe extra delay for RTC latch on reads?)
@@ -43,15 +44,15 @@ void MD_receive_buf(GB_megaduck_laptop_t * periph) {
             periph->rx_buffer_count = 0; // 0 bytes of payload received so far
             if (periph->rx_buffer_size > 0) {
                 periph->rx_buffer_state = MEGADUCK_RX_BUF_2_PAYLOAD;
-                MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_OK);
+                MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_OK);
             } else {
                 periph->rx_buffer_state = MEGADUCK_RX_BUF_5_FAIL;
-                MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR); // Implied by System ROM but not verified on hardware
+                MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR); // Implied by System ROM but not verified on hardware
             }
             #ifdef MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
                 printf("*** RX BUFFER: size=%d (raw:0x%02x)\n", periph->rx_buffer_size, periph->rx_buffer_size + 2);
             #endif
-            MD_enqueue_ext_clk_send_finalize(periph);
+            MD_send_buf_finalize_and_transmit(periph);
             break;
 
         case MEGADUCK_RX_BUF_2_PAYLOAD:
@@ -64,8 +65,8 @@ void MD_receive_buf(GB_megaduck_laptop_t * periph) {
             if (periph->rx_buffer_count == periph->rx_buffer_size)
                 periph->rx_buffer_state = MEGADUCK_RX_BUF_3_CHECKSUM;
 
-            MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_OK);
-            MD_enqueue_ext_clk_send_finalize(periph);
+            MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_SEND_BUFFER_OK);
+            MD_send_buf_finalize_and_transmit(periph);
             break;
 
         case MEGADUCK_RX_BUF_3_CHECKSUM:
@@ -93,12 +94,12 @@ void MD_receive_buf(GB_megaduck_laptop_t * periph) {
                 // Success
                 MD_receive_buf_handle_result(periph);
                 periph->rx_buffer_state = MEGADUCK_RX_BUF_4_DONE;
-                MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_OK);
+                MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_OK);
             } else {
                 periph->rx_buffer_state = MEGADUCK_RX_BUF_5_FAIL;
-                MD_enqueue_ext_clk_send(periph, MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_FAIL); // Implied by System ROM but not verified on hardware
+                MD_send_buf_enqueue(periph, MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_FAIL); // Implied by System ROM but not verified on hardware
             }
-            MD_enqueue_ext_clk_send_finalize(periph);
+            MD_send_buf_finalize_and_transmit(periph);
             break;
     }  // end: switch (periph->rx_buffer_state)
 }

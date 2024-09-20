@@ -1394,7 +1394,7 @@ void GB_serial_set_data_bit(GB_gameboy_t *gb, bool data)
                        " [State: %d, RX Counter: %d, EXT-queue: %d, Ticks: %d]"
                        " (PC=0x%04x SC=0x%02x)\n",
                    gb->megaduck_laptop.state, gb->megaduck_laptop.init_counter,
-                   gb->megaduck_laptop.ext_clk_send_queue_size, gb->megaduck_laptop.t_states_till_update,
+                   gb->megaduck_laptop.ext_clk_send_buf_size, gb->megaduck_laptop.t_states_till_update,
                    gb->pc, gb->io_registers[GB_IO_SC]);
 
         #endif

@@ -8,9 +8,11 @@
 // #define MEGADUCK_SYS_SERIAL_LOGGING_ENABLED
 // #define MEGADUCK_SYS_SERIAL_LOG_ALL_IN_OUT
 // #define MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
+// #define MEGADUCK_SYS_SERIAL_LOG_TX_BUFFER
 // #define MEGADUCK_SYS_SERIAL_LOG_TX_BYTES
 
 // #define MEGADUCK_SYS_KEYBOARD_LOG_SEND_NON_NULL
+// #define MEGADUCK_SYS_FORCE_LOCAL_DATE_TIME_REPLY
 
 // #define GB_LOG_SERIAL_IO_DETAILS
 
@@ -40,15 +42,15 @@ typedef struct {
     // External Clock mode states and values
     int32_t  t_states_till_update;
     uint8_t  ext_clk_send_bit_counter;
-    uint16_t ext_clk_send_queue_size;
-    uint16_t ext_clk_send_queue_index;
-    uint8_t  ext_clk_send_queue[MEGADUCK_BUF_SZ];
+    uint16_t ext_clk_send_buf_size;
+    uint16_t ext_clk_send_buf_index;
+    uint8_t  ext_clk_send_buf[MEGADUCK_BUF_SZ];
 
     // Peripheral state
     uint8_t state;
     uint8_t key;
     uint8_t key_modifiers;
-    struct tm tm_rtc_time;
+    time_t time_delta_rtc_vs_host;
 
     // Multi-byte buffers
     uint8_t rx_buffer_state;
@@ -87,9 +89,12 @@ enum {
     // Command reply states
     MEGADUCK_SYS_STATE_REPLY_CMD_0x09_UNKNOWN,
     // Multi-byte receive states
-    MEGADUCK_SYS_STATE_CMD_SET_RTC,                    // External Clock (partial)
-    MEGADUCK_SYS_STATE_READ_KEYS_TX,                   // External Clock
-    MEGADUCK_SYS_STATE_READ_KEYS_WAIT_ACK,
+    MEGADUCK_SYS_STATE_CMD_SET_RTC,                   // External Clock (partial)
+    MEGADUCK_SYS_STATE_GET_RTC_TX,                // External Clock
+    MEGADUCK_SYS_STATE_GET_RTC_WAIT_ACK,
+
+    MEGADUCK_SYS_STATE_GET_KEYS_TX,                   // External Clock
+    MEGADUCK_SYS_STATE_GET_KEYS_WAIT_ACK,
 
 
     MEGADUCK_SYS_POWER_ON_RESET  = MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER,
@@ -130,7 +135,7 @@ enum {
 
 enum {
     MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST      = 0x00,  // Value sent to request the 255..0 countdown sequence (be sent into the serial port)
-    MEGADUCK_SYS_CMD_READ_KEYS             = 0x00,  // Requests a multi-byte buffer with keyboard data from Peripheral
+    MEGADUCK_SYS_CMD_GET_KEYS             = 0x00,  // Requests a multi-byte buffer with keyboard data from Peripheral
     MEGADUCK_SYS_CMD_DONE_OR_OK            = 0x01,  // TODO: What does this do and why?
     MEGADUCK_SYS_CMD_DONE_OR_OK_AND_SOMETHING = 0x81,  // TODO: Seen this as a keyboard poll done reply instead of 0x01 by the calculator app, not sure what the difference is
     MEGADUCK_SYS_CMD_ABORT_OR_FAIL         = 0x04,  // TODO: What does this do and why?
@@ -193,8 +198,8 @@ enum {
     // Reply to command that initiated the buffer write requires 2+ msec delay for unknown reasons
     // (at least for buffer reads maybe extra delay for RTC latch or keyboard matrix scan on)
     MEGADUCK_LAPTOP_TICK_COUNT_RX_BUF_START = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2.5),  // TODO: Not verified on hardware, assumed based on System ROM
-    MEGADUCK_LAPTOP_TICK_COUNT_KBD_REPLY_START = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2.5),  // TODO: Not verified on hardware, assumed based on System ROM
-    MEGADUCK_LAPTOP_TICK_COUNT_KBD_REPLY_NEXT  = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2),    // TODO: Not verified on hardware, assumed based on System ROM
+    MEGADUCK_LAPTOP_TICK_COUNT_TX_BUF_REPLY_START = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2.5),  // TODO: Not verified on hardware, assumed based on System ROM
+    MEGADUCK_LAPTOP_TICK_COUNT_TX_BUF_REPLY_NEXT  = (int)MEGADUCK_LAPTOP_TICK_DELAY_MSEC(2),    // TODO: Not verified on hardware, assumed based on System ROM
 
     MEGADUCK_LAPTOP_EXT_CLOCK_SEND_INDEX_RESET = 0,
 
@@ -226,7 +231,8 @@ enum {
 // ;
 // ; LEFT_PRINTSCREEN 00 + modifier 0x08 ??? Right seems to have actual keycode
 enum {
-    MEGADUCK_KBD_BUF_REPLY_LEN = 4,
+    MEGADUCK_KBD_BUF_REPLY_LEN =  4, // 1 Length Header, 2 Payload, 1 Checksum
+    MEGADUCK_RTC_BUF_REPLY_LEN = 10, // 1 Length Header, 8 Payload, 1 Checksum
 
 };
 
@@ -442,6 +448,3 @@ void GB_megaduck_laptop_reset(GB_gameboy_t *gb);
 void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles);
 
 void MD_periph_reset(GB_megaduck_laptop_t * periph, uint8_t target_state);
-
-void MD_enqueue_ext_clk_send(GB_megaduck_laptop_t * periph, uint8_t byte_to_enqueue);
-void MD_enqueue_ext_clk_send_finalize(GB_megaduck_laptop_t * periph);
