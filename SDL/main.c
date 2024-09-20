@@ -962,7 +962,7 @@ restart:
     static char start_text[64];
     static char title[17];
     GB_get_rom_title(&gb, title);
-    sprintf(start_text, "SameDuck v" GB_VERSION "\n%s\n%08X", title, GB_get_rom_crc32(&gb));
+    sprintf(start_text, "Super Junior SameDuck v" GB_VERSION "\n%s\n%08X", title, GB_get_rom_crc32(&gb));
     show_osd_text(start_text);
 
     /* Configure symbols */
@@ -1161,7 +1161,7 @@ int main(int argc, char **argv)
     }
 
     if (argc > 2 || (argc == 2 && argv[1][0] == '-')) {
-        fprintf(stderr, "SameDuck v" GB_VERSION "\n");
+        fprintf(stderr, "Super Junior SameDuck v" GB_VERSION "\n");
         fprintf(stderr, "Usage: %s [--fullscreen|-f] [--nogl] [--stop-debugger|-s] [--model <model>] [--force-mbc <hex mbc number>] [--workboy | --megaduck_laptop] <rom>\n", argv[0]);
         exit(1);
     }
@@ -1182,10 +1182,10 @@ int main(int argc, char **argv)
 
     if ((console_supported = CON_start(completer))) {
         CON_set_repeat_empty(true);
-        CON_printf("SameDuck v" GB_VERSION "\n");
+        CON_printf("Super Junior SameDuck v" GB_VERSION "\n");
     }
     else {
-        fprintf(stderr, "SameDuck v" GB_VERSION "\n");
+        fprintf(stderr, "Super Junior SameDuck v" GB_VERSION "\n");
     }
     
     strcpy(prefs_path, resource_path("prefs.bin"));
@@ -1250,7 +1250,7 @@ int main(int argc, char **argv)
     SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS,
                 configuration.allow_background_controllers? "1" : "0");
 
-    window = SDL_CreateWindow("SameDuck v" GB_VERSION, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
+    window = SDL_CreateWindow("Super Junior SameDuck v" GB_VERSION, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
                               160 * configuration.default_scale, 144 * configuration.default_scale, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (window == NULL) {
         fputs(SDL_GetError(), stderr);

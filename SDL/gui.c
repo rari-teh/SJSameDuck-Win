@@ -93,7 +93,7 @@ static const char *help[] = {
 " Toggle channel: " ALT_STRING "+(1-4)\n"
 " Break Debugger:    " CTRL_STRING "+C",
 "\n"
-"SameDuck\n"
+"Super Junior SameDuck\n"
 "Version " GB_VERSION "\n\n"
 "Copyright " COPYRIGHT_STRING " 2015-" GB_COPYRIGHT_YEAR "\n"
 "Lior Halphon\n\n"
