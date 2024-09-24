@@ -50,6 +50,9 @@ typedef struct {
     uint8_t state;
     uint8_t key;
     uint8_t key_modifiers;
+    uint8_t last_key;
+    uint8_t last_key_modifiers;
+
     time_t time_delta_rtc_vs_host;
 
     // Multi-byte buffers
@@ -60,16 +63,9 @@ typedef struct {
     int     rx_buffer_count;
     uint8_t rx_buffer[MEGADUCK_BUF_SZ];
 
-
     // Power-On Init Counter state
     uint8_t init_counter;
 
-    // uint8_t mode;
-    // bool shift_down;
-    // bool user_shift_down;
-
-    // uint8_t buffer[0x15];
-    // uint8_t buffer_index; // In nibbles during read, in bytes during write
 } GB_megaduck_laptop_t;
 
 typedef void (*GB_megaduck_laptop_set_time_callback)(GB_gameboy_t *gb, time_t time);
@@ -140,7 +136,7 @@ enum {
     MEGADUCK_SYS_CMD_DONE_OR_OK_AND_SOMETHING = 0x81,  // TODO: Seen this as a keyboard poll done reply instead of 0x01 by the calculator app, not sure what the difference is
     MEGADUCK_SYS_CMD_ABORT_OR_FAIL         = 0x04,  // TODO: What does this do and why?
     MEGADUCK_SYS_CMD_RUN_CART_IN_SLOT      = 0x08,  //
-    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09     = 0x09,  //
+    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09     = 0x09,  // May also be PrintScreen related
     MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME = 0x0B,  // Sets Hardware RTC Date and Time using multi-byte buffer send/TX
     MEGADUCK_SYS_CMD_RTC_GET_DATE_AND_TIME = 0x0C,  // Requests a multi-byte buffer with RTC data from Peripheral
 };
@@ -378,6 +374,7 @@ enum {
     MEGADUCK_KBD_CODE_MEMORY_PLUS         =  0xCD,
     MEGADUCK_KBD_CODE_MEMORY_RECALL       =  0xD1,
     MEGADUCK_KBD_CODE_SQUAREROOT          =  0xD5,
+
     // ; ** 3x3 Arrow and Math Key area **
     // ; Continued Row 6
     MEGADUCK_KBD_CODE_MULTIPLY            =  0xD9,
@@ -423,7 +420,7 @@ enum {
     MEGADUCK_KBD_CODE_PIANO_SI            =  0xD3,
     MEGADUCK_KBD_CODE_PIANO_DO_2          =  0xD7,
     MEGADUCK_KBD_CODE_PIANO_RE_2          =  0xDB,
-    MEGADUCK_KBD_CODE_PIANO_MI_2          =  0xEF,
+    MEGADUCK_KBD_CODE_PIANO_MI_2          =  0xDF,
     MEGADUCK_KBD_CODE_PIANO_FA_2          =  0xE3,
     MEGADUCK_KBD_CODE_PIANO_SOL_2         =  0xE7,
     MEGADUCK_KBD_CODE_PIANO_LA_2          =  0xEB,
@@ -443,7 +440,10 @@ void GB_connect_megaduck_laptop(GB_gameboy_t *gb,
                         GB_megaduck_laptop_get_time_callback get_time_callback);
 void GB_megaduck_laptop_use_alt_initial_stack_value(GB_gameboy_t *gb);
 bool GB_megaduck_laptop_is_enabled(GB_gameboy_t *gb);
-void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key);
+
+void GB_megaduck_laptop_key_set(GB_gameboy_t *gb, uint8_t key, uint8_t key_modifiers);
+void GB_megaduck_laptop_key_release(GB_gameboy_t *gb, uint8_t key, uint8_t key_modifiers);
+
 void GB_megaduck_laptop_reset(GB_gameboy_t *gb);
 void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles);
 

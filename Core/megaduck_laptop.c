@@ -49,6 +49,10 @@ static void idle_handle_commands(GB_megaduck_laptop_t * periph) {
             periph->state = MEGADUCK_SYS_STATE_CMD_SET_RTC;
             MD_receive_buf_init(periph);
             break;
+
+        default:
+            printf(" !! Duck Serial Periph: Unknown command received during idle+configured state: 0x%02x (may not be sio corrected, so read as >> 1)\n", periph->byte_being_received);
+            break;
     }
     // TX/Reply byte is ignored by System ROM
     periph->byte_to_send = 0x00; // TODO: Also not yet known what value it typically is
@@ -175,10 +179,31 @@ bool GB_megaduck_laptop_is_enabled(GB_gameboy_t *gb) {
 }
 
 
-void GB_megaduck_laptop_set_key(GB_gameboy_t *gb, uint8_t key) {
+void GB_megaduck_laptop_key_set(GB_gameboy_t *gb, uint8_t key, uint8_t key_modifiers) {
+
     if (gb->accessory != GB_ACCESSORY_MEGADUCK_LAPTOP) return;
+    // GB_log(gb, "key=0x%02x, key_mod=0x%02x (Prev: key=0x%02x, key_mod=0x%02x) VS (Prev: key=0x%02x, key_mod=0x%02x)\n",
+    //        key, key_modifiers, gb->megaduck_laptop.key, gb->megaduck_laptop.key_modifiers, gb->megaduck_laptop.last_key, gb->megaduck_laptop.last_key_modifiers);
 
     gb->megaduck_laptop.key = key;
+    gb->megaduck_laptop.key_modifiers = key_modifiers;
+}
+
+
+void GB_megaduck_laptop_key_release(GB_gameboy_t *gb, uint8_t key, uint8_t key_modifiers) {
+    if (gb->accessory != GB_ACCESSORY_MEGADUCK_LAPTOP) return;
+
+    // Always clear the key on keyup events
+    // regardless if a match was found in PC -> Duck key translation
+    if (key != MEGADUCK_KBD_CODE_NONE)
+        gb->megaduck_laptop.key = MEGADUCK_KBD_CODE_NONE;
+
+    // No need to clear key repeat flag since key_modifiers argument to this function will never have it set
+    gb->megaduck_laptop.key_modifiers = key_modifiers;
+
+    // Update key repeat tracking
+    gb->megaduck_laptop.last_key = gb->megaduck_laptop.key;
+    gb->megaduck_laptop.last_key_modifiers = gb->megaduck_laptop.key_modifiers;
 }
 
 

@@ -42,9 +42,12 @@ static char *battery_save_path_ptr = NULL;
 static SDL_GLContext gl_context = NULL;
 static bool console_supported = false;
 
-static bool peripheral_text_input_mode = false;  // For Workboy and MegaDuck Laptop
+// For Workboy and MegaDuck Laptop
+static bool peripheral_text_input_mode = false;
+static uint8_t peripheral_modifier_state = 0;
 static bool workboy_enabled = false;
 static bool megaduck_laptop_enabled = false;
+static uint8_t megaduck_laptop_key_modifiers = MEGADUCK_KBD_FLAGS_NONE;
 static char mbc_string[255] = "";
 
 
@@ -218,8 +221,22 @@ static void open_menu(void)
 }
 
 
-
+// Receives SDL_KEYDOWN and SDL_TEXTINPUT events
 static void peripheral_handle_key_down(SDL_Event event) {
+
+    // TODO: properly handle KEY REPEAT (flag on keyboard polling state)
+
+    // Update cached modifier key state.
+    // This is needed for blocking some CTRL+keys that make it through to SDL_TEXTINPUT
+    if (event.type == SDL_KEYDOWN) peripheral_modifier_state = event.key.keysym.mod;
+
+    // Block SDL_TEXTINPUT when CTRL is pressed
+    //
+    // Not all keys get blocked for SDL_TEXTINPUT when CTRL is pressed,
+    // so try to filter those out if CTRL is currently active
+    // https://github.com/libsdl-org/SDL/issues/4695
+    // https://github.com/libsdl-org/SDL/issues/4695#issuecomment-907791166
+    if ((event.type == SDL_TEXTINPUT) && (peripheral_modifier_state & KMOD_CTRL)) return;
 
     if (workboy_enabled) {
         // if (GB_workboy_is_enabled(&gb)) {
@@ -228,14 +245,20 @@ static void peripheral_handle_key_down(SDL_Event event) {
 
     } else if (megaduck_laptop_enabled) {
 
-        uint8_t key = megaduck_laptop_SDLscancode_to_key(event);
-        GB_megaduck_laptop_set_key(&gb, key);
-        // if (key != MEGADUCK_KBD_CODE_NONE) GB_megaduck_laptop_set_key(&gb, key);
+        uint8_t key = MEGADUCK_KBD_CODE_NONE;
+        megaduck_laptop_SDLscancode_to_key(event, &key, &megaduck_laptop_key_modifiers);
+        // GB_megaduck_laptop_key_set(&gb, key, megaduck_laptop_key_modifiers);
+        if (key != MEGADUCK_KBD_CODE_NONE) GB_megaduck_laptop_key_set(&gb, key, megaduck_laptop_key_modifiers);
     }
 }
 
 
+// Receives SDL_KEYUP events
 static void peripheral_handle_key_up(SDL_Event event) {
+
+    // Update cached modifier key state.
+    // This is needed for blocking some CTRL+keys that make it through to SDL_TEXTINPUT
+    if (event.type == SDL_KEYUP) peripheral_modifier_state = event.key.keysym.mod;
 
     if (workboy_enabled) {
         switch (event.key.keysym.scancode) {
@@ -244,6 +267,11 @@ static void peripheral_handle_key_up(SDL_Event event) {
 
             default: GB_workboy_set_key(&gb, GB_WORKBOY_NONE);
         }
+    } else if (megaduck_laptop_enabled) {
+
+        uint8_t key;
+        megaduck_laptop_SDLscancode_to_key(event, &key, &megaduck_laptop_key_modifiers);
+        GB_megaduck_laptop_key_release(&gb, key, megaduck_laptop_key_modifiers);
     }
 }
 
@@ -434,19 +462,30 @@ static void handle_events(GB_gameboy_t *gb)
                 GB_set_key_state(gb, GB_KEY_DOWN, updown == 1);
                 break;
             };
-                
+            case SDL_TEXTINPUT:
+                    // If peripheral text input mode is enabled, try to capture keys as converted characters.
+                    // This won't include function keys and similar, which still need to be captured with SDL_KEYDOWN
+                    if (peripheral_text_input_mode) {
+                        peripheral_handle_key_down(event);
+                        // TODO: DUCK: re-check whether code should continue here after SDL_TEXTINPUT event (does peripheral_handle_key_down() need a bool for whether a match was found?)
+                        // continue;
+                    }
+                break;
+
             case SDL_KEYDOWN:
 
                 if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
                     peripheral_text_input_mode = !peripheral_text_input_mode;
                     if (peripheral_text_input_mode) {
-                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy/Duck Laptop Input Mode: enabled. F12 to Exit", window);
+                        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy/Duck Laptop Input Mode: enabled. F12 to Exit.\nTab = Help Key, Piano = Ctrl + (F1 - F10 and Top Row: \"`\" - Backspace)", window);
+                        SDL_StartTextInput(); // Start SDL text input mode to capture translated characters (to avoid having to deal with different keyboard layouts to generate chars that require Shift modifiers)
                     } else {
                         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Info", "Workboy/Duck Laptop Input Mode: disabled", window);
+                        SDL_StopTextInput();
                     }
                     continue;
                 } else {
-                    // If workboy text input mode is enabled, capture all keys aside from the mode toggle key
+                    // If peripheral text input mode is enabled, capture all keys aside from the mode toggle key
                     if (peripheral_text_input_mode) {
                         peripheral_handle_key_down(event);
                         continue;
