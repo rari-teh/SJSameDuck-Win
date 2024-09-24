@@ -342,11 +342,11 @@ endif
 # Define our targets
 
 ifeq ($(PLATFORM),windows32)
-SDL_TARGET := $(BIN)/SDL/sameduck.exe $(BIN)/SDL/sameduck_debugger.exe $(BIN)/SDL/SDL2.dll
+SDL_TARGET := $(BIN)/SDL/superjunior_sameduck.exe $(BIN)/SDL/superjunior_sameduck_debugger.exe $(BIN)/SDL/SDL2.dll
 TESTER_TARGET := $(BIN)/tester/sameduck_tester.exe
 else
 # SDL_TARGET := $(BIN)/SDL/sameboy
-SDL_TARGET := $(BIN)/SDL/sameduck $(BIN)/SDL/sameduck_debugger
+SDL_TARGET := $(BIN)/SDL/superjunior_sameduck $(BIN)/SDL/superjunior_sameduck_debugger
 TESTER_TARGET := $(BIN)/tester/sameduck_tester
 endif
 
@@ -584,7 +584,7 @@ $(BIN)/XdgThumbnailer/sameboy-thumbnailer: $(CORE_OBJECTS) $(XDG_THUMBNAILER_OBJ
 # SDL Port
 
 # Unix versions build only one binary
-$(BIN)/SDL/sameduck: $(CORE_OBJECTS) $(SDL_OBJECTS)
+$(BIN)/SDL/superjunior_sameduck: $(CORE_OBJECTS) $(SDL_OBJECTS)
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(FAT_FLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS)
 ifeq ($(CONF), release)
@@ -592,17 +592,17 @@ ifeq ($(CONF), release)
 	$(CODESIGN) $@
 endif
 
-$(BIN)/SDL/sameduck_debugger: $(CORE_OBJECTS) $(SDL_OBJECTS) #  $(OBJ)/Windows/resources.o
+$(BIN)/SDL/superjunior_sameduck_debugger: $(CORE_OBJECTS) $(SDL_OBJECTS) #  $(OBJ)/Windows/resources.o
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) # -Wl,/subsystem:console
 
 
 # Windows version builds two, one with a conole and one without it
-$(BIN)/SDL/sameduck.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
+$(BIN)/SDL/superjunior_sameduck.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) -Wl,/subsystem:windows
 
-$(BIN)/SDL/sameduck_debugger.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
+$(BIN)/SDL/superjunior_sameduck_debugger.exe: $(CORE_OBJECTS) $(SDL_OBJECTS) $(OBJ)/Windows/resources.o
 	-@$(MKDIR) -p $(dir $@)
 	$(CC) $^ -o $@ $(LDFLAGS) $(SDL_LDFLAGS) $(GL_LDFLAGS) -Wl,/subsystem:console
 
