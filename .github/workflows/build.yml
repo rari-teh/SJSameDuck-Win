@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  sanity:
+    strategy:
+      fail-fast: false
+      matrix:
+#        os: [ubuntu-latest, ubuntu-20.04]
+        # Just build Linux SDL for now
+        os: [ubuntu-20.04]
+#        cc: [gcc, clang]
+        cc: [gcc]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install deps
+        shell: bash
+        run: |
+          ./.github/actions/install_deps.sh ${{ matrix.os }}
+
+      - name: Build
+        run: |
+          ${{ matrix.cc }} -v; (make -j CONF=release CC=${{ matrix.cc }} || (echo "==== Build Failed ==="; make CONF=release CC=${{ matrix.cc }}))
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: SuperJuniorSameDuck-${{ matrix.os }}-${{ matrix.cc }}
+          path: |
+            build/bin
+            build/lib
+            build/include

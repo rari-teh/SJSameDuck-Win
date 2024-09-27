@@ -1,10 +1,10 @@
 name: "Bulidability and Sanity"
 on:
-  push:
-    branches:
-      - master
-      - '*'
-      - '!libretro'
+ push:
+   branches:
+     - master
+     - '*'
+     - '!libretro'
 
 jobs:
   sanity:
