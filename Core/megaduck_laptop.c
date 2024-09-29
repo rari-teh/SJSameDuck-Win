@@ -193,9 +193,18 @@ void GB_megaduck_laptop_key_set(GB_gameboy_t *gb, uint8_t key, uint8_t key_modif
 void GB_megaduck_laptop_key_release(GB_gameboy_t *gb, uint8_t key, uint8_t key_modifiers) {
     if (gb->accessory != GB_ACCESSORY_MEGADUCK_LAPTOP) return;
 
+    // TODO: To make this more accurate vs Hardware: track and maintain state of all "hardware keys" pressed
+    //       instead of releasing *all* keys when any single key is released.
+    //       Then when sending which single key is pressed, transmit the one with the highest value
+    //       (roughly how it seems to work, though there may be some odd exceptions to that
+    //        which lock up sending any key if they are pressed as a secondary or more key?).
+
+    // GB_log(gb, "released: key=0x%02x, key_mod=0x%02x (Prev: key=0x%02x, key_mod=0x%02x) VS (Prev: key=0x%02x, key_mod=0x%02x)\n",
+    //        key, key_modifiers, gb->megaduck_laptop.key, gb->megaduck_laptop.key_modifiers, gb->megaduck_laptop.last_key, gb->megaduck_laptop.last_key_modifiers);
+
     // Always clear the key on keyup events
     // regardless if a match was found in PC -> Duck key translation
-    if (key != MEGADUCK_KBD_CODE_NONE)
+    // if (key != MEGADUCK_KBD_CODE_NONE)
         gb->megaduck_laptop.key = MEGADUCK_KBD_CODE_NONE;
 
     // No need to clear key repeat flag since key_modifiers argument to this function will never have it set
