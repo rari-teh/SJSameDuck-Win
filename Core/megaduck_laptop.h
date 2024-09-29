@@ -116,8 +116,8 @@ enum {
     MEGADUCK_SYS_REPLY_BOOT_END_OK   = 0x00, // Anything WITHOUT bit .0 set // TODO: Specific value not verified on hardware 
     MEGADUCK_SYS_REPLY_BOOT_END_FAIL = 0x01, // Anything WITH    bit .0 set // TODO: Specific value not verified on hardware 
 
-    MEGADUCK_SYS_REPLY_CMD_INIT_UNKNOWN_0x09 = 0xFF, // TODO: Not verified on hardware, need to snoop it
-    MEGADUCK_SYS_REPLY_SEND_BUFFER_OK        = 0x03, // Verified
+    MEGADUCK_SYS_REPLY_CMD_INIT_UNKNOWN_0x09   = 0xFF, // TODO: Not verified on hardware, need to snoop it
+    MEGADUCK_SYS_REPLY_SEND_BUFFER_OK          = 0x03, // Verified
     MEGADUCK_SYS_REPLY_SEND_BUFFER_MAYBE_ERROR = 0x06, // Still not sure what this signifies, but failure of some kind
 
     MEGADUCK_SYS_REPLY_BUFFER_SEND_AND_CHECKSUM_OK   = 0x01,
@@ -130,15 +130,15 @@ enum {
 
 
 enum {
-    MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST      = 0x00,  // Value sent to request the 255..0 countdown sequence (be sent into the serial port)
-    MEGADUCK_SYS_CMD_GET_KEYS             = 0x00,  // Requests a multi-byte buffer with keyboard data from Peripheral
-    MEGADUCK_SYS_CMD_DONE_OR_OK            = 0x01,  // TODO: What does this do and why?
+    MEGADUCK_SYS_CMD_INIT_SEQ_REQUEST         = 0x00,  // Value sent to request the 255..0 countdown sequence (be sent into the serial port)
+    MEGADUCK_SYS_CMD_GET_KEYS                 = 0x00,  // Requests a multi-byte buffer with keyboard data from Peripheral
+    MEGADUCK_SYS_CMD_DONE_OR_OK               = 0x01,  // TODO: What does this do and why?
     MEGADUCK_SYS_CMD_DONE_OR_OK_AND_SOMETHING = 0x81,  // TODO: Seen this as a keyboard poll done reply instead of 0x01 by the calculator app, not sure what the difference is
-    MEGADUCK_SYS_CMD_ABORT_OR_FAIL         = 0x04,  // TODO: What does this do and why?
-    MEGADUCK_SYS_CMD_RUN_CART_IN_SLOT      = 0x08,  //
-    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09     = 0x09,  // May also be PrintScreen related
-    MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME = 0x0B,  // Sets Hardware RTC Date and Time using multi-byte buffer send/TX
-    MEGADUCK_SYS_CMD_RTC_GET_DATE_AND_TIME = 0x0C,  // Requests a multi-byte buffer with RTC data from Peripheral
+    MEGADUCK_SYS_CMD_ABORT_OR_FAIL            = 0x04,  // TODO: What does this do and why?
+    MEGADUCK_SYS_CMD_RUN_CART_IN_SLOT         = 0x08,  //
+    MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09        = 0x09,  // May also be PrintScreen related
+    MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME    = 0x0B,  // Sets Hardware RTC Date and Time using multi-byte buffer send/TX
+    MEGADUCK_SYS_CMD_RTC_GET_DATE_AND_TIME    = 0x0C,  // Requests a multi-byte buffer with RTC data from Peripheral
 };
 
 
