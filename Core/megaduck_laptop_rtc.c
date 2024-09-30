@@ -32,7 +32,7 @@ void MD_rtc_set_from_buf(GB_megaduck_laptop_t * periph) {
         tm_rtc_time.tm_year = rtc_year; // In BCD with a rollover to 00 at 2000. System ROM uses dates as old as 1992 (0x92)
         tm_rtc_time.tm_mon  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_MON]) - 1;
         tm_rtc_time.tm_mday = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_DAY]);
-        // MEGADUCK_RTC_IDX_DOW
+        // MEGADUCK_RTC_IDX_DOW (ignore this, let timegm() recalculate it)
         tm_rtc_time.tm_hour = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_HOUR])
                                               + (periph->rx_buffer[MEGADUCK_RTC_IDX_AMPM] * 12);
         tm_rtc_time.tm_min  = bcd_to_int(periph->rx_buffer[MEGADUCK_RTC_IDX_MIN]);
@@ -80,7 +80,7 @@ void MD_rtc_enqueue_reply(GB_megaduck_laptop_t * periph) {
         MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_year)); // Years in BCD since 1900 (tm_year is already in since 1900 format)
     MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_mon + 1)   );
     MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_mday)      );
-    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_wday)      ); // DOW
+    MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_wday)      ); // DOW (tm_wday, days since Sunday, 0-6)
 
     MD_send_buf_enqueue(periph, int_to_bcd( (tm.tm_hour < 12) ? 0 : 1 )); // AMPM
     MD_send_buf_enqueue(periph, int_to_bcd(tm.tm_hour % 12));

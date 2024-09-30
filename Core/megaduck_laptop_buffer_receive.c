@@ -56,6 +56,10 @@ void MD_receive_buf(GB_megaduck_laptop_t * periph) {
             break;
 
         case MEGADUCK_RX_BUF_2_PAYLOAD:
+            // #ifdef MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
+            //     printf("*** RX BUFFER: [%d] = 0x%02x\n", periph->rx_buffer_count, periph->byte_being_received);
+            // #endif
+
             // Save received data byte, increment counter
             if (periph->rx_buffer_count < MEGADUCK_BUF_SZ)
                 periph->rx_buffer[periph->rx_buffer_count] = periph->byte_being_received;
