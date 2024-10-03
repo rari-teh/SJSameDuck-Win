@@ -5,6 +5,27 @@
 #include <time.h>
 #include "defs.h"
 
+
+/* Q: (paraphrased) Is it possible to enable SC internal clock transfer
+      with internal clock before loading payload byte into SB?
+
+   A [nitro2k01]: This is actually safe.
+    - clock generator for serial hardware unit
+      - fed by the 16384 Hz tap of DIV
+        - divides it by 2 to create 8192 Hz
+
+      - This divider is reset every time SC is written
+      - first pulse that shifts bits
+        - happens next negative edge of the output of the divider
+
+    - So you have like 63-127 M cycles from writing SC
+      - depending on the current phase of DIV.
+    - Ie, first bit of transfer
+      - doesn't happen until this divider (COTY, near top left)
+        - receives a second 16384 Hz clock pulse
+*/
+#define DUCK_IMPROVED_SIO_TIMING
+
 // #define MEGADUCK_SYS_SERIAL_LOGGING_ENABLED
 // #define MEGADUCK_SYS_SERIAL_LOG_ALL_IN_OUT
 // #define MEGADUCK_SYS_SERIAL_LOG_RX_BUFFER
@@ -18,6 +39,7 @@
 
 // #define DEBUG_LOG_DUCK_TRANSLATED_IO
 // #define DEBUG_LOG_DUCK_SERIAL_IO
+// #define DEBUG_LOG_DUCK_SERIAL_IO_BITS
 // #define DEBUG_LOG_DUCK_UNHANDLED_0x7FFF_POSSIBLE_BANK_WRITES
 
 #define MEGADUCK_BUF_SZ  256

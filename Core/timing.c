@@ -195,6 +195,23 @@ void GB_serial_master_edge(GB_gameboy_t *gb)
     gb->serial_master_clock ^= true;
     
     if (!gb->serial_master_clock && (gb->io_registers[GB_IO_SC] & 0x81) == 0x81) {
+
+        #ifdef DUCK_IMPROVED_SIO_TIMING
+        // Changed vs SameBoy: SIO code now does *NOT* expect first bit to have
+        // been clocked as soon as SC was written to (if 0x81).
+        //
+        // So the order of operations here has to change:
+        // - Clock the bit in first (instead of last)
+        // - Then do remainder of the SIO handling that was previously done
+        // - And do *NOT* clock a bit at the end of the handling here
+        if (gb->serial_count < 8) {
+            /* Still more bits to send */
+            if (gb->serial_transfer_bit_start_callback) {
+                gb->serial_transfer_bit_start_callback(gb, gb->io_registers[GB_IO_SB] & 0x80);
+            }
+        }
+        #endif
+
         gb->serial_count++;
         if (gb->serial_count == 8) {
             gb->serial_count = 0;
@@ -210,14 +227,16 @@ void GB_serial_master_edge(GB_gameboy_t *gb)
         else {
             gb->io_registers[GB_IO_SB] |= 1;
         }
-        
+
+        #ifndef DUCK_IMPROVED_SIO_TIMING
         if (gb->serial_count) {
             /* Still more bits to send */
             if (gb->serial_transfer_bit_start_callback) {
                 gb->serial_transfer_bit_start_callback(gb, gb->io_registers[GB_IO_SB] & 0x80);
             }
         }
-        
+        #endif
+
     }
 }
 

@@ -1450,7 +1450,7 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
             case GB_IO_SB:
                 #ifdef DEBUG_LOG_DUCK_SERIAL_IO
                     if ((addr & 0xFF) == GB_IO_SB)
-                        GB_log(gb, "    * gb: write SB_reg: <- 0x%02x (PC=0x%04x)\n", value, gb->pc);
+                        GB_log(gb, "    * gb: write SB_reg: <- 0x%02x (PC=0x%04x DIV=0x%04x CYCLES=0x%08x)\n", value, gb->pc, gb->div_counter, gb->cycles_since_vblank_callback);
                 #endif
             case GB_IO_PSWX:
             case GB_IO_PSWY:
@@ -1758,23 +1758,38 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
                 TODO: When a cable is connected, the clock of the other side affects "zombie" serial clocking */
             case GB_IO_SC:
                 #ifdef DEBUG_LOG_DUCK_SERIAL_IO
-                    GB_log(gb, "    * gb: write SC_reg: <- 0x%02x (PC=0x%04x)\n", value, gb->pc);
+                    GB_log(gb, "    * gb: write SC_reg: <- 0x%02x (PC=0x%04x DIV=0x%04x CYCLES=0x%08x)\n", value, gb->pc, gb->div_counter, gb->cycles_since_vblank_callback);
                 #endif
                 gb->serial_count = 0;
                 if (!gb->cgb_mode) {
                     value |= 2;
                 }
-                if (gb->serial_master_clock) {
-                    GB_serial_master_edge(gb);
-                }
-                gb->io_registers[GB_IO_SC] = value | (~0x83);
-                gb->serial_mask = gb->cgb_mode && (value & 2)? 4 : 0x80;
-                if ((value & 0x80) && (value & 0x1) ) {
-                    if (gb->serial_transfer_bit_start_callback) {
-                        gb->serial_transfer_bit_start_callback(gb, gb->io_registers[GB_IO_SB] & 0x80);
-                    }
-                }
 
+                #ifdef DUCK_IMPROVED_SIO_TIMING
+                    // Changed vs SameBoy: writing 0x81 to SC now:
+                    // - Resets serial_master_clock=low
+                    // - Does *NOT* clock the first bit immediately. Instead waits for
+                    //   serial_master_clock to complete a full low->hi->low transition
+                    //   before first bit gets clocked on negative edge.
+                    //
+                    // This allows atypical, but apparently ok behavior, of
+                    // enabling SC transfer then loading data
+                    gb->serial_master_clock = false;
+                    gb->io_registers[GB_IO_SC] = value | (~0x83);
+                    gb->serial_mask = gb->cgb_mode && (value & 2)? 4 : 0x80;
+                #else
+                    // Old serial code that sent as soon as SC was triggered
+                    if (gb->serial_master_clock) {
+                        GB_serial_master_edge(gb);
+                    }
+                    gb->io_registers[GB_IO_SC] = value | (~0x83);
+                    gb->serial_mask = gb->cgb_mode && (value & 2)? 4 : 0x80;
+                    if ((value & 0x80) && (value & 0x1) ) {
+                        if (gb->serial_transfer_bit_start_callback) {
+                            gb->serial_transfer_bit_start_callback(gb, gb->io_registers[GB_IO_SB] & 0x80);
+                        }
+                    }
+                #endif
                 return;
 
             case GB_IO_RP: {

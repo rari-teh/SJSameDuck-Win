@@ -110,6 +110,9 @@ static void serial_start(GB_gameboy_t *gb, bool bit_received) {
 
     GB_megaduck_laptop_t * periph = &gb->megaduck_laptop;
 
+    #ifdef DEBUG_LOG_DUCK_SERIAL_IO_BITS
+        GB_log(gb, "\n-> PERIPH: serial_start: bit_rx=%d[sio_ct: %d] | div=0x%04x | serial_master_clock=%d\n", bit_received, gb->serial_count, gb->div_counter, gb->serial_master_clock);
+    #endif
     periph->byte_being_received <<= 1;
     periph->byte_being_received |= bit_received;
     periph->bits_received++;
