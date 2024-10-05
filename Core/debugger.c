@@ -1626,6 +1626,18 @@ static bool mbc(GB_gameboy_t *gb, char *arguments, char *modifiers, const debugg
             };
             GB_log(gb, "%s\n", mapper_names[cartridge->mbc_type]);
         }
+
+        if (cartridge->mbc_type == DUCK_SYSROM) {
+            GB_log(gb, "Current mapped 32K-size ROM0+X bank: %d\n", gb->duck_sysrom.rom_bank);
+            GB_log(gb, "- Below is 16K slice format -\n");
+            GB_log(gb, "Current mapped ROM0 bank: %x\n", gb->mbc_rom0_bank);
+        }
+        else if (cartridge->mbc_type == DUCK_MD1) {
+            GB_log(gb, "Current mapped 32K-size ROM0+X bank: %d\n", gb->duck_md1.rom_bank);
+            GB_log(gb, "- Below is 16K slice format -\n");
+            GB_log(gb, "Current mapped ROM0 bank: %x\n", gb->mbc_rom0_bank);
+        }
+
         if (cartridge->mbc_type == GB_MMM01 || cartridge->mbc_type == GB_MBC1) {
             GB_log(gb, "Current mapped ROM0 bank: %x\n", gb->mbc_rom0_bank);
         }
@@ -1658,8 +1670,6 @@ static bool mbc(GB_gameboy_t *gb, char *arguments, char *modifiers, const debugg
     if (cartridge->has_rtc) {
         GB_log(gb, "Cart contains a real time clock\n");
     }
-    GB_log(gb, "Current mapped ROM bank: %x\n", gb->mbc_rom_bank);
-    GB_log(gb, "Current mapped ROM0 bank: %x\n", gb->mbc_rom0_bank);
 
     return true;
 }
