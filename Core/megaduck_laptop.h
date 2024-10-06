@@ -108,12 +108,13 @@ enum {
     MEGADUCK_SYS_STATE_REPLY_CMD_0x09_UNKNOWN,
     // Multi-byte receive states
     MEGADUCK_SYS_STATE_CMD_SET_RTC,                   // External Clock (partial)
-    MEGADUCK_SYS_STATE_GET_RTC_TX,                // External Clock
+    MEGADUCK_SYS_STATE_GET_RTC_TX,                    // External Clock
     MEGADUCK_SYS_STATE_GET_RTC_WAIT_ACK,
 
     MEGADUCK_SYS_STATE_GET_KEYS_TX,                   // External Clock
     MEGADUCK_SYS_STATE_GET_KEYS_WAIT_ACK,
 
+    MEGADUCK_SYS_STATE_CMD_PLAYSPEECH,               // External Clock (partial)
 
     MEGADUCK_SYS_POWER_ON_RESET  = MEGADUCK_SYS_STATE_INIT_1_WAIT_RX_COUNTER,
     MEGADUCK_SYS_KEEP_INIT_RESET = MEGADUCK_SYS_STATE_INIT_OK_READY,
@@ -157,6 +158,7 @@ enum {
     MEGADUCK_SYS_CMD_DONE_OR_OK               = 0x01,  // TODO: What does this do and why?
     MEGADUCK_SYS_CMD_DONE_OR_OK_AND_SOMETHING = 0x81,  // TODO: Seen this as a keyboard poll done reply instead of 0x01 by the calculator app, not sure what the difference is
     MEGADUCK_SYS_CMD_ABORT_OR_FAIL            = 0x04,  // TODO: What does this do and why?
+    MEGADUCK_SYS_CMD_PLAYSPEECH              = 0x05,  // Play pre-recorded speech samples (range 1-6, no audio enable required)
     MEGADUCK_SYS_CMD_RUN_CART_IN_SLOT         = 0x08,  //
     MEGADUCK_SYS_CMD_INIT_UNKNOWN_0x09        = 0x09,  // May also be PrintScreen related
     MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME    = 0x0B,  // Sets Hardware RTC Date and Time using multi-byte buffer send/TX
@@ -191,6 +193,20 @@ enum {
     MEGADUCK_RTC_IDX_SEC   = 7,
 };
 
+// Speech Playback command (From Duck -> Peripheral)
+//     Command: (0x05) MEGADUCK_SYS_CMD_PLAYSPEECH
+//     Buffer: 1 Bytes
+//         00: Speech Phrase Num : Range 1-6
+enum {
+    MEGADUCK_BUF_SZ_PLAYSPEECH = 1,      // 1 byte (size without len and checksum bytes)
+    MEGADUCK_PLAYSPEECH_IDX_SAMPLE_NUM  = 0  // 
+};
+
+
+enum {
+    MEGADUCK_SPEECH_CMD_MIN = 1,
+    MEGADUCK_SPEECH_CMD_MAX = 6
+};
 
  // In T-States, approximately 8192 Hz to match normal speed serial link with external clock
 //

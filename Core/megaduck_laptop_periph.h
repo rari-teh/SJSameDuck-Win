@@ -28,3 +28,6 @@ void MD_rtc_enqueue_reply(GB_megaduck_laptop_t * periph);
 // Keyboard
 void MD_keyboard_enqueue_reply(GB_megaduck_laptop_t * periph);
 void MD_send_buf_handle_tx_reply(GB_megaduck_laptop_t * periph);
+
+// Speech
+void MD_speech_playback(GB_megaduck_laptop_t * periph);

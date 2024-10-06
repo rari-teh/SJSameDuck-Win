@@ -31,6 +31,10 @@ void MD_receive_buf_handle_result(GB_megaduck_laptop_t * periph) {
         case MEGADUCK_SYS_CMD_RTC_SET_DATE_AND_TIME:
             MD_rtc_set_from_buf(periph);
             break;
+
+        case MEGADUCK_SYS_CMD_PLAYSPEECH:
+            MD_speech_playback(periph);
+            break;
     }
 }
 

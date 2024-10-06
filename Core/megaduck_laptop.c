@@ -50,6 +50,11 @@ static void idle_handle_commands(GB_megaduck_laptop_t * periph) {
             MD_receive_buf_init(periph);
             break;
 
+        case MEGADUCK_SYS_CMD_PLAYSPEECH:
+            periph->state = MEGADUCK_SYS_STATE_CMD_PLAYSPEECH;
+            MD_receive_buf_init(periph);
+            break;
+
         default:
             printf(" !! Duck Serial Periph: Unknown command received during idle+configured state: 0x%02x (may not be sio corrected, so read as >> 1)\n", periph->byte_being_received);
             break;
@@ -88,8 +93,8 @@ static void handle_received_byte(GB_megaduck_laptop_t * periph) {
             break;
 
         // Multi-Byte Receive *FROM* the MegaDuck
+        case MEGADUCK_SYS_STATE_CMD_PLAYSPEECH:  // Fall through to shared handling
         case MEGADUCK_SYS_STATE_CMD_SET_RTC:
-            // Other handling of multi-byte receive commands could call through to here
             // Replies handled via periph_megaduck_laptop_peripheral_update()
             MD_receive_buf(periph);
             break;
@@ -290,7 +295,9 @@ void GB_megaduck_laptop_peripheral_update(GB_gameboy_t *gb, uint8_t cycles) {
                         periph->state = MEGADUCK_SYS_STATE_INIT_OK_READY;
                         break;
 
+                    case MEGADUCK_SYS_STATE_CMD_PLAYSPEECH: // Fall through to shared handling
                     case MEGADUCK_SYS_STATE_CMD_SET_RTC:
+                        // Multi-byte buffer receive
                         if ((periph->rx_buffer_state == MEGADUCK_RX_BUF_4_DONE) ||
                             (periph->rx_buffer_state == MEGADUCK_RX_BUF_5_FAIL)) {
                             // Return to initialized ready waiting state
