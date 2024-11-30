@@ -5,6 +5,8 @@
 
 #include "megaduck_laptop_periph.h"
 
+#define timegm _mkgmtime
+
 static inline uint8_t int_to_bcd(uint8_t i)
 {
     return (i % 10) + ((i / 10) << 4);
